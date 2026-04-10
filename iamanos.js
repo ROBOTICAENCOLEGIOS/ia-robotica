@@ -1,25 +1,22 @@
-﻿/**
- * IA: Visión REC Pro - VERSIÓN CORREGIDA
- * Soluciona el problema de variables que no actualizan.
+﻿// @turbowarp-force-unsandboxed
+/**
+ * IA: Visión REC Pro
  */
-
 (function (Scratch) {
   'use strict';
 
   if (!Scratch.extensions.unsandboxed) {
-    throw new Error('Debe ejecutarse en modo unsandboxed.');
+    console.warn('Requiere modo unsandboxed.');
   }
 
   class IAVisionRECPro {
     constructor() {
       this.video = null;
       this.status = "Apagado";
-      // Inicializamos con valores por defecto claros
       this.facesDetected = 0;
       this.handsDetected = 0;
       this.isPinching = false;
       this.indexX = 0;
-      this.modelsReady = false;
 
       this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js");
       this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js");
@@ -45,19 +42,6 @@
           { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR cámara' },
           { opcode: 'getStatus', blockType: Scratch.BlockType.REPORTER, text: 'Estado de la IA' },
           "---",
-          {
-            opcode: 'setVideoPos',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover cámara a x: [X] y: [Y]',
-            arguments: { X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }, Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 } }
-          },
-          {
-            opcode: 'setVideoSize',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamaño de cámara al [SIZE] %',
-            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
-          },
-          "---",
           { opcode: 'getFaces', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
           { opcode: 'getHands', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
           { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: '¿dedos pellizcando?' },
@@ -80,29 +64,23 @@
         Object.assign(this.video.style, {
           position: 'fixed', zIndex: '1000', border: '3px solid #FF5733',
           borderRadius: '10px', left: '10px', top: '10px', width: '240px', 
-          pointerEvents: 'none', transform: 'scaleX(-1)' // Espejo para que sea intuitivo
+          pointerEvents: 'none', transform: 'scaleX(-1)'
         });
         document.body.appendChild(this.video);
 
-        // Forzar carga de modelos si no están listos
         const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
 
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5 });
         faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: true, minDetectionConfidence: 0.5 });
 
-        // CALLBACK DE MANOS CORREGIDO
         hands.onResults((results) => {
           this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
           if (this.handsDetected > 0) {
-            const h = results.multiHandLandmarks[0]; // Usar la primera mano detectada
-            // El punto 8 es la punta del índice, el 4 es la punta del pulgar
-            const dist = Math.sqrt(
-              Math.pow(h[4].x - h[8].x, 2) + 
-              Math.pow(h[4].y - h[8].y, 2)
-            );
+            const h = results.multiHandLandmarks[0];
+            const dist = Math.sqrt(Math.pow(h[4].x - h[8].x, 2) + Math.pow(h[4].y - h[8].y, 2));
             this.isPinching = dist < 0.08; 
-            this.indexX = (0.5 - h[8].x) * 480; // Invertido por el modo espejo
+            this.indexX = (0.5 - h[8].x) * 480;
           } else {
             this.isPinching = false;
           }
@@ -125,7 +103,6 @@
 
         this.status = "Listo para detectar";
       } catch (err) {
-        console.error(err);
         this.status = "Error: Sin cámara";
       }
     }
@@ -142,8 +119,6 @@
       this.isPinching = false;
     }
 
-    setVideoPos(args) { if (this.video) { this.video.style.left = args.X + 'px'; this.video.style.top = args.Y + 'px'; } }
-    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
     getStatus() { return this.status; }
     getFaces() { return this.facesDetected; }
     getHands() { return this.handsDetected; }
