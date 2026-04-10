@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robotica en Colegios - Editor IA</title>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <script>
+        // Configuramos las rutas de tu GitHub
+        const user = "ROBOTICAENCOLEGIOS";
+        const repo = "ia-robotica"; // SI TU REPO TIENE OTRO NOMBRE, CAMBIALO AQUÍ
+        const base = `https://${user}.github.io/${repo}/`;
+
+        // Tus extensiones
+        const ext_pcb = base + "extesionpcb.js";
+        const ext_manos = base + "iamanos.js";
+        const ext_transito = base + "senialestransito.js";
+        const ext_voz = base + "vozatexto.js";
+
+        // URL que carga TurboWarp + tus 4 extensiones automáticamente
+        const twUrl = `https://turbowarp.org/editor?extension=${ext_pcb}&extension=${ext_manos}&extension=${ext_transito}&extension=${ext_voz}`;
+
+        const iframe = document.createElement('iframe');
+        iframe.src = twUrl;
+        iframe.allow = "camera; microphone; bluetooth"; 
+        document.body.appendChild(iframe);
+    </script>
+</body>
+</html>
