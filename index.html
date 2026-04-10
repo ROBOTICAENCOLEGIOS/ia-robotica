@@ -1,34 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Laboratorio IA - Robótica en Colegios</title>
-    <style>
-        body { background: #111; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
-    </style>
-</head>
+<html>
 <body>
-    <div>🚀 Preparando entorno de IA...</div>
-
     <script>
-        const user = "ROBOTICAENCOLEGIOS";
-        const repo = "ia-robotica";
-        
-        // Usamos cdn.jsdelivr.net para saltar el bloqueo de seguridad (CORS)
-        const base = `https://cdn.jsdelivr.net/gh/${user}/${repo}@main/`;
-
-        const exts = [
-            base + "extensionpcb.js",
-            base + "iamanos.js",
-            base + "senialestransito.js",
-            base + "vozatexto.js"
-        ];
-
-        // Construimos la URL
-        const twUrl = `https://turbowarp.org/editor?extension=${exts.join('&extension=')}`;
-        
-        // Redirección inmediata
-        window.location.href = twUrl;
+        // Probamos cargar solo UNA para ver si el problema es la cantidad
+        const url = "https://turbowarp.org/editor?extension=https://roboticaencolegios.github.io/ia-robotica/extensionpcb.js";
+        window.location.replace(url);
     </script>
 </body>
 </html>
