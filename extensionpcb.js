@@ -6,9 +6,8 @@
 (function (Scratch) { 
     'use strict';
 
-    // Verificación de seguridad unsandboxed
     if (!Scratch.extensions.unsandboxed) {
-        console.warn('La extensión REC PCB1 requiere modo unsandboxed. Intentando elevar privilegios...');
+        throw new Error('Esta extensión requiere modo unsandboxed para acceder al Serial API.');
     }
 
     class RecPcb1Arduino { 
@@ -65,68 +64,103 @@
             };
         }
 
-        _connected() { return !!(this._activePort && this._activePort.readable && this._activePort.writable); }
-        checkConnection() { return this._connected() ? 'Connected' : 'Disconnected'; }
-
         async connectRobot() {
             try {
                 this.port = await navigator.serial.requestPort();
-                await this._disconnect();
                 this._activePort = this.port;
                 await this._activePort.open({ baudRate: 115200 });
-                this._rxRemainder = '';
-                this._lineWaiters = [];
                 this._startReadLoop();
-            } catch (e) { this._activePort = null; }
-        }
-
-        async _disconnect() {
-            this._readLoopRunning = false;
-            if (this._activePort) {
-                try { await this._activePort.close(); } catch (_) {}
-                this._activePort = null;
-            }
-        }
-
-        _enqueueSerial(task) {
-            const next = this._serialQueue.then(() => task());
-            this._serialQueue = next.catch(() => {});
-            return next;
-        }
-
-        async _sendLineRaw(msg) {
-            if (!this._activePort || !this._activePort.writable) return;
-            const writer = this._activePort.writable.getWriter();
-            try { await writer.write(this.encoder.encode(msg + '\n')); } finally { writer.releaseLock(); }
-        }
-
-        async _sendLine(msg) { return this._enqueueSerial(() => this._sendLineRaw(msg)); }
-
-        _waitForLine(predicate, timeoutMs) {
-            return new Promise((resolve, reject) => {
-                const w = { predicate, resolve, reject };
-                this._lineWaiters.push(w);
-                if (timeoutMs > 0) {
-                    w.timer = setTimeout(() => {
-                        const j = this._lineWaiters.indexOf(w);
-                        if (j >= 0) this._lineWaiters.splice(j, 1);
-                        reject(new Error('Timeout'));
-                    }, timeoutMs);
-                }
-                const origResolve = w.resolve;
-                w.resolve = (val) => { if (w.timer) clearTimeout(w.timer); origResolve(val); };
-            });
+            } catch (e) { console.error(e); }
         }
 
         _startReadLoop() {
-            if (this._readLoopRunning || !this._activePort || !this._activePort.readable) return;
+            if (this._readLoopRunning || !this._activePort) return;
             this._readLoopRunning = true;
             const run = async () => {
+                const reader = this._activePort.readable.getReader();
                 try {
-                    while (this._activePort && this._readLoopRunning) {
-                        const reader = this._activePort.readable.getReader();
-                        try {
-                            for (;;) {
-                                const { value, done } = await reader.read();
-                                if (done) break;
-                                if (value && value.
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        this._feedBytes(value);
+                    }
+                } finally { reader.releaseLock(); }
+            };
+            run();
+        }
+
+        _feedBytes(u8) {
+            this._rxRemainder += this.decoder.decode(u8, { stream: true });
+            let idx;
+            while ((idx = this._rxRemainder.indexOf('\n')) >= 0) {
+                const line = this._rxRemainder.slice(0, idx).trim();
+                this._rxRemainder = this._rxRemainder.slice(idx + 1);
+                if (line) this._dispatchLine(line);
+            }
+        }
+
+        _dispatchLine(line) {
+            for (let i = 0; i < this._lineWaiters.length; i++) {
+                const w = this._lineWaiters[i];
+                if (w.predicate(line)) {
+                    this._lineWaiters.splice(i, 1);
+                    w.resolve(line);
+                    return;
+                }
+            }
+        }
+
+        async _sendLineRaw(msg) {
+            if (!this._activePort) return;
+            const writer = this._activePort.writable.getWriter();
+            await writer.write(this.encoder.encode(msg + '\n'));
+            writer.releaseLock();
+        }
+
+        async _sendLine(msg) {
+            this._serialQueue = this._serialQueue.then(() => this._sendLineRaw(msg));
+            return this._serialQueue;
+        }
+
+        _waitForLine(predicate, timeout) {
+            return new Promise((resolve, reject) => {
+                const w = { predicate, resolve, reject };
+                this._lineWaiters.push(w);
+                setTimeout(() => {
+                    const idx = this._lineWaiters.indexOf(w);
+                    if (idx >= 0) {
+                        this._lineWaiters.splice(idx, 1);
+                        reject();
+                    }
+                }, timeout);
+            });
+        }
+
+        async moveForward(args) { await this._sendLine(`AT+M_${args.SIDE}=${Math.round(args.PCT * 2.55)}`); }
+        async moveBackward(args) { await this._sendLine(`AT+M_${args.SIDE}=-${Math.round(args.PCT * 2.55)}`); }
+        async stopMotor(args) { await this._sendLine(args.WHICH === 'AMBOS' ? 'AT+MOTOR=STOP' : `AT+M_${args.WHICH}=0`); }
+        async lightOn(args) { 
+            const r = parseInt(args.COLOR.slice(1,3), 16);
+            const g = parseInt(args.COLOR.slice(3,5), 16);
+            const b = parseInt(args.COLOR.slice(5,7), 16);
+            await this._sendLine(`AT+LED${args.LED}=${r},${g},${b}`); 
+        }
+        async lightOff(args) { await this._sendLine(`AT+LED${args.LED}=0,0,0`); }
+        async playNote(args) { await this._sendLine(`AT+NOTE=${args.NOTE},${args.MS}`); }
+        
+        async distanceCm() {
+            const p = this._waitForLine(l => /^\d+$/.test(l), 1000).catch(() => "999");
+            await this._sendLineRaw('AT+DISTANCIA');
+            return await p;
+        }
+        async lineDetected() {
+            const p = this._waitForLine(l => l === "0" || l === "1", 1000).catch(() => "0");
+            await this._sendLineRaw('AT+IR');
+            return (await p) === "1";
+        }
+        _connected() { return !!this._activePort; }
+        checkConnection() { return this._connected() ? 'Connected' : 'Disconnected'; }
+    }
+
+    Scratch.extensions.register(new RecPcb1Arduino(Scratch.runtime));
+})(Scratch);
