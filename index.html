@@ -1,10 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Laboratorio IA - Robótica en Colegios</title>
+    <style>
+        body { background: #111; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
+    </style>
+</head>
 <body>
+    <div>🚀 Iniciando Modo Experto (Unsandboxed)...</div>
+
     <script>
-        // Probamos cargar solo UNA para ver si el problema es la cantidad
-        const url = "https://turbowarp.org/editor?extension=https://roboticaencolegios.github.io/ia-robotica/extensionpcb.js";
-        window.location.replace(url);
+        const user = "ROBOTICAENCOLEGIOS";
+        const repo = "ia-robotica";
+        const base = `https://${user}.github.io/${repo}/`;
+
+        // Lista de tus extensiones
+        const exts = [
+            base + "extensionpcb.js",
+            base + "iamanos.js",
+            base + "senialestransito.js",
+            base + "vozatexto.js"
+        ];
+
+        // LA CLAVE: Cambiamos "extension=" por "unsandboxed-extension="
+        const twUrl = `https://turbowarp.org/editor?unsandboxed-extension=${exts.join('&unsandboxed-extension=')}`;
+        
+        window.location.href = twUrl;
     </script>
 </body>
 </html>
