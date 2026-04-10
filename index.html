@@ -2,33 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robotica en Colegios - Editor IA</title>
+    <title>Cargando Robotica en Colegios...</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #000; }
-        iframe { width: 100%; height: 100%; border: none; }
+        body { background: #000; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
     </style>
 </head>
 <body>
+    <div>Cargando Editor de IA...</div>
     <script>
-        // Configuramos las rutas de tu GitHub
         const user = "ROBOTICAENCOLEGIOS";
-        const repo = "ia-robotica"; // SI TU REPO TIENE OTRO NOMBRE, CAMBIALO AQUÍ
+        const repo = "ia-robotica"; 
         const base = `https://${user}.github.io/${repo}/`;
-
-        // Tus extensiones
-        const ext_pcb = base + "extesionpcb.js";
-        const ext_manos = base + "iamanos.js";
-        const ext_transito = base + "senialestransito.js";
-        const ext_voz = base + "vozatexto.js";
-
-        // URL que carga TurboWarp + tus 4 extensiones automáticamente
-        const twUrl = `https://turbowarp.org/editor?extension=${ext_pcb}&extension=${ext_manos}&extension=${ext_transito}&extension=${ext_voz}`;
-
-        const iframe = document.createElement('iframe');
-        iframe.src = twUrl;
-        iframe.allow = "camera; microphone; bluetooth"; 
-        document.body.appendChild(iframe);
+        const exts = [
+            base + "extesionpcb.js",
+            base + "iamanos.js",
+            base + "senialestransito.js",
+            base + "vozatexto.js"
+        ];
+        const finalUrl = `https://turbowarp.org/editor?extension=${exts.join('&extension=')}`;
+        window.location.href = finalUrl;
     </script>
 </body>
 </html>
