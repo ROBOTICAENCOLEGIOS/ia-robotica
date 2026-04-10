@@ -1,19 +1,39 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>REC - Laboratorio IA</title>
-    <style>body{background:#000;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;}</style>
+    <meta charset="UTF-8">
+    <title>REC - Laboratorio de IA</title>
+    <style>
+        body { background: #000; color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; margin: 0; }
+        .loader { border: 4px solid #333; border-top: 4px solid #eab308; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-    <div>🚀 Iniciando Modo Experto...</div>
+    <div class="loader"></div>
+    <div id="status">Sincronizando extensiones con GitHub...</div>
+
     <script>
-        const base = "https://roboticaencolegios.github.io/ia-robotica/";
-        const files = ["extensionpcb.js", "iamanos.js", "senialestransito.js", "vozatexto.js"];
+        const user = "ROBOTICAENCOLEGIOS";
+        const repo = "ia-robotica";
+        const base = `https://${user}.github.io/${repo}/`;
         
-        // La clave es el parámetro 'unsandboxed-extension' en la URL
-        const url = `https://turbowarp.org/editor?unsandboxed-extension=${files.map(f => base + f).join('&unsandboxed-extension=')}`;
-        
-        window.location.href = url;
+        // El timestamp evita que el navegador use una versión vieja del código
+        const v = Date.now(); 
+
+        const extensions = [
+            `${base}extensionpcb.js?v=${v}`,
+            `${base}iamanos.js?v=${v}`,
+            `${base}senialestransito.js?v=${v}`,
+            `${base}vozatexto.js?v=${v}`
+        ];
+
+        // Construcción de la URL de TurboWarp
+        const twUrl = `https://turbowarp.org/editor?unsandboxed-extension=${extensions.join('&unsandboxed-extension=')}`;
+
+        setTimeout(() => {
+            window.location.href = twUrl;
+        }, 1000);
     </script>
 </body>
 </html>
