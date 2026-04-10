@@ -9,17 +9,25 @@
 </head>
 <body>
     <div>Cargando Editor de IA...</div>
+
     <script>
+        // Configuración de tu repositorio
         const user = "ROBOTICAENCOLEGIOS";
         const repo = "ia-robotica"; 
         const base = `https://${user}.github.io/${repo}/`;
+
+        // Lista de extensiones (nombres verificados de tu repositorio)
         const exts = [
-            base + "extesionpcb.js",
+            base + "extensionpcb.js",
             base + "iamanos.js",
             base + "senialestransito.js",
             base + "vozatexto.js"
         ];
+
+        // Construcción de la URL de TurboWarp inyectando las 4 extensiones
         const finalUrl = `https://turbowarp.org/editor?extension=${exts.join('&extension=')}`;
+
+        // Salto automático al editor
         window.location.href = finalUrl;
     </script>
 </body>
