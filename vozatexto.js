@@ -1,8 +1,9 @@
 // @turbowarp-force-unsandboxed
 (function(Scratch) {
   'use strict';
+
   if (!Scratch.extensions.unsandboxed) {
-    console.warn('Requiere modo unsandboxed para el micrófono');
+    throw new Error('Requiere modo unsandboxed para usar el micrófono');
   }
 
   class VozATexto {
@@ -21,7 +22,10 @@
         blocks: [
           { opcode: 'startListening', blockType: Scratch.BlockType.COMMAND, text: 'empezar a escuchar voz' },
           { opcode: 'stopListening', blockType: Scratch.BlockType.COMMAND, text: 'detener micrófono' },
-          { opcode: 'getLastSpeech', blockType: Scratch.BlockType.REPORTER, text: 'último texto reconocido' }
+          { opcode: 'clearSpeech', blockType: Scratch.BlockType.COMMAND, text: 'limpiar texto reconocido' },
+          "---",
+          { opcode: 'getLastSpeech', blockType: Scratch.BlockType.REPORTER, text: 'último texto reconocido' },
+          { opcode: 'isMicrophoneActive', blockType: Scratch.BlockType.BOOLEAN, text: '¿escuchando?' }
         ]
       };
     }
@@ -32,15 +36,17 @@
         this.recognition = new SR();
         this.recognition.lang = 'es-ES';
         this.recognition.onstart = () => { this.isListening = true; };
-        this.recognition.onresult = (e) => { this.speechResult = e.results[0][0].transcript.toLowerCase(); };
+        this.recognition.onresult = (e) => { this.speechResult = e.results[e.results.length - 1][0].transcript.toLowerCase().trim(); };
+        this.recognition.onerror = () => { this.isListening = false; };
         this.recognition.onend = () => { this.isListening = false; };
       }
     }
 
-    startListening() { if (this.recognition) this.recognition.start(); }
-    stopListening() { if (this.recognition) this.recognition.stop(); }
+    startListening() { if (this.recognition && !this.isListening) try { this.recognition.start(); } catch (e) {} }
+    stopListening() { if (this.recognition && this.isListening) this.recognition.stop(); }
+    clearSpeech() { this.speechResult = ""; }
+    isMicrophoneActive() { return this.isListening; }
     getLastSpeech() { return this.speechResult; }
   }
-
   Scratch.extensions.register(new VozATexto());
 })(Scratch);
