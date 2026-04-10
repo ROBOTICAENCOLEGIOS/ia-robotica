@@ -4,36 +4,61 @@
     <meta charset="UTF-8">
     <title>REC - Laboratorio de IA</title>
     <style>
-        body { background: #000; color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; margin: 0; }
-        .loader { border: 4px solid #333; border-top: 4px solid #eab308; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        body { 
+            background: #000; 
+            color: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+        }
+        .loader { 
+            border: 4px solid #333; 
+            border-top: 4px solid #eab308; 
+            border-radius: 50%; 
+            width: 50px; 
+            height: 50px; 
+            animation: spin 1s linear infinite; 
+            margin-bottom: 20px; 
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #status { font-weight: bold; letter-spacing: 1px; color: #eab308; }
     </style>
 </head>
 <body>
     <div class="loader"></div>
-    <div id="status">Sincronizando extensiones con GitHub...</div>
+    <div id="status">Sincronizando Laboratorio REC con GitHub...</div>
 
     <script>
         const user = "ROBOTICAENCOLEGIOS";
         const repo = "ia-robotica";
         const base = `https://${user}.github.io/${repo}/`;
         
-        // El timestamp evita que el navegador use una versión vieja del código
+        // El v=Date.now() es vital para que NO cargue versiones viejas de tus archivos
         const v = Date.now(); 
 
-        const extensions = [
-            `${base}extensionpcb.js?v=${v}`,
-            `${base}iamanos.js?v=${v}`,
-            `${base}senialestransito.js?v=${v}`,
-            `${base}vozatexto.js?v=${v}`
+        const fileNames = [
+            "extensionpcb.js",
+            "iamanos.js",
+            "senialestransito.js",
+            "vozatexto.js"
         ];
 
-        // Construcción de la URL de TurboWarp
-        const twUrl = `https://turbowarp.org/editor?unsandboxed-extension=${extensions.join('&unsandboxed-extension=')}`;
+        // Creamos la lista de extensiones con el truco anti-caché (?v=...)
+        const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
+
+        // IMPORTANTE: Para modo Unsandboxed se usa el parámetro 'unsandboxed-extension'
+        // Cada extensión debe llevar su propio parámetro.
+        const params = extensions.map(url => `unsandboxed-extension=${encodeURIComponent(url)}`).join('&');
+        
+        const twUrl = `https://turbowarp.org/editor?${params}`;
 
         setTimeout(() => {
             window.location.href = twUrl;
-        }, 1000);
+        }, 1200);
     </script>
 </body>
 </html>
