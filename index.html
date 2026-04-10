@@ -2,17 +2,20 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cargando Robotica en Colegios...</title>
+    <title>Laboratorio IA - Robótica en Colegios</title>
     <style>
-        body { background: #000; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
+        body { background: #111; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
     </style>
 </head>
 <body>
-    <div>Iniciando Laboratorio de IA...</div>
+    <div>🚀 Preparando entorno de IA...</div>
+
     <script>
         const user = "ROBOTICAENCOLEGIOS";
         const repo = "ia-robotica";
-        const base = `https://${user}.github.io/${repo}/`;
+        
+        // Usamos cdn.jsdelivr.net para saltar el bloqueo de seguridad (CORS)
+        const base = `https://cdn.jsdelivr.net/gh/${user}/${repo}@main/`;
 
         const exts = [
             base + "extensionpcb.js",
@@ -21,10 +24,11 @@
             base + "vozatexto.js"
         ];
 
-        // Agregamos el parámetro "full-screen" para que cargue mejor
-        const finalUrl = `https://turbowarp.org/editor?full-screen&extension=${exts.join('&extension=')}`;
+        // Construimos la URL
+        const twUrl = `https://turbowarp.org/editor?extension=${exts.join('&extension=')}`;
         
-        window.location.href = finalUrl;
+        // Redirección inmediata
+        window.location.href = twUrl;
     </script>
 </body>
 </html>
