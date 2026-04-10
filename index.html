@@ -1,32 +1,19 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Laboratorio IA - Robótica en Colegios</title>
-    <style>
-        body { background: #111; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
-    </style>
+    <title>REC - Laboratorio IA</title>
+    <style>body{background:#000;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;}</style>
 </head>
 <body>
-    <div>🚀 Iniciando Modo Experto (Unsandboxed)...</div>
-
+    <div>🚀 Iniciando Modo Experto...</div>
     <script>
-        const user = "ROBOTICAENCOLEGIOS";
-        const repo = "ia-robotica";
-        const base = `https://${user}.github.io/${repo}/`;
-
-        // Lista de tus extensiones
-        const exts = [
-            base + "extensionpcb.js",
-            base + "iamanos.js",
-            base + "senialestransito.js",
-            base + "vozatexto.js"
-        ];
-
-        // LA CLAVE: Cambiamos "extension=" por "unsandboxed-extension="
-        const twUrl = `https://turbowarp.org/editor?unsandboxed-extension=${exts.join('&unsandboxed-extension=')}`;
+        const base = "https://roboticaencolegios.github.io/ia-robotica/";
+        const files = ["extensionpcb.js", "iamanos.js", "senialestransito.js", "vozatexto.js"];
         
-        window.location.href = twUrl;
+        // La clave es el parámetro 'unsandboxed-extension' en la URL
+        const url = `https://turbowarp.org/editor?unsandboxed-extension=${files.map(f => base + f).join('&unsandboxed-extension=')}`;
+        
+        window.location.href = url;
     </script>
 </body>
 </html>
