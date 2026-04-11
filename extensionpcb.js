@@ -7,10 +7,6 @@ Web Serial API @ 115200 baud. Verde Militar & Bloques Musicales.
 (function (Scratch) {
   'use strict';
   
-  if (!Scratch.extensions.unsandboxed) { 
-    throw new Error('Esta extensión debe ejecutarse sin sandbox (unsandboxed).'); 
-  }
-  
   class RecPcb1Arduino {
     constructor(runtime) {
       this.runtime = runtime;
