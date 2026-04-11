@@ -1,0 +1,17 @@
+{
+  "short_name": "Laboratorio REC",
+  "name": "REC - IA y Robótica Educativa",
+  "icons": [
+    {
+      "src": "https://roboticaencolegios.github.io/ia-robotica/icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/ia-robotica/index.html",
+  "background_color": "#000000",
+  "display": "standalone",
+  "scope": "/ia-robotica/",
+  "theme_color": "#EAB308"
+}
