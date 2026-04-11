@@ -2,7 +2,13 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REC - Laboratorio de IA</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#EAB308">
+    <link rel="apple-touch-icon" href="https://roboticaencolegios.github.io/ia-robotica/icon.png">
+
     <style>
         body { 
             background: #000; 
@@ -14,6 +20,7 @@
             height: 100vh; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0; 
+            text-align: center;
         }
         .loader { 
             border: 4px solid #333; 
@@ -25,7 +32,7 @@
             margin-bottom: 20px; 
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #status { font-weight: bold; letter-spacing: 1px; color: #eab308; }
+        #status { font-weight: bold; letter-spacing: 1px; color: #eab308; padding: 0 20px; }
     </style>
 </head>
 <body>
@@ -33,11 +40,21 @@
     <div id="status">Sincronizando Laboratorio REC con GitHub...</div>
 
     <script>
+        // 1. REGISTRO DEL SERVICE WORKER (Para permitir la instalación PWA)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registrado', reg))
+                    .catch(err => console.log('Error al registrar SW', err));
+            });
+        }
+
+        // 2. LÓGICA DE REDIRECCIÓN HACIA TURBOWARP
         const user = "ROBOTICAENCOLEGIOS";
         const repo = "ia-robotica";
         const base = `https://${user}.github.io/${repo}/`;
         
-        // El v=Date.now() es vital para que NO cargue versiones viejas de tus archivos
+        // Evita versiones viejas de los archivos JS
         const v = Date.now(); 
 
         const fileNames = [
@@ -47,17 +64,18 @@
             "vozatexto.js"
         ];
 
-        // Creamos la lista de extensiones con el truco anti-caché (?v=...)
+        // Crear URLs con parámetros anti-caché
         const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
 
-        // IMPORTANTE: TurboWarp usa el parámetro 'extension' para todas las extensiones
-        // El modo unsandboxed se maneja automáticamente con // @turbowarp-force-unsandboxed
+        // Construir los parámetros para TurboWarp
         const params = extensions.map(url => `extension=${encodeURIComponent(url)}`).join('&');
         
+        // URL final del editor
         const twUrl = `https://turbowarp.org/editor?${params}`;
 
+        // Redirección con reemplazo de historial para mejorar la experiencia PWA
         setTimeout(() => {
-            window.location.href = twUrl;
+            window.location.replace(twUrl);
         }, 1200);
     </script>
 </body>
