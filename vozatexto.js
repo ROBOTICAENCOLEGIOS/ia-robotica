@@ -1,10 +1,6 @@
 // @turbowarp-force-unsandboxed
 (function(Scratch) {
   'use strict';
-  if (!Scratch.extensions.unsandboxed) {
-    throw new Error('Requiere modo unsandboxed para usar el micrófono');
-  }
-
   class VozATexto {
     constructor() {
       this.speechResult = ""; 
