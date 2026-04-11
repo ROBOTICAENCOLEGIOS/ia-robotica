@@ -7,7 +7,7 @@
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#EAB308">
-    <link rel="apple-touch-icon" href="https://roboticaencolegios.github.io/ia-robotica/icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
 
     <style>
         body { 
@@ -22,61 +22,88 @@
             margin: 0; 
             text-align: center;
         }
+        .logo {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+            object-fit: contain;
+        }
         .loader { 
             border: 4px solid #333; 
             border-top: 4px solid #eab308; 
             border-radius: 50%; 
-            width: 50px; 
-            height: 50px; 
+            width: 40px; 
+            height: 40px; 
             animation: spin 1s linear infinite; 
-            margin-bottom: 20px; 
+            margin: 20px auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #status { font-weight: bold; letter-spacing: 1px; color: #eab308; padding: 0 20px; }
+        #status { font-weight: bold; color: #eab308; padding: 0 20px; font-size: 1.2rem; }
+        
+        button {
+            margin-top: 25px;
+            padding: 15px 40px;
+            background: #eab308;
+            color: #000;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            display: none; /* Se muestra solo si no es PWA */
+            transition: transform 0.2s;
+        }
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
-    <div class="loader"></div>
-    <div id="status">Sincronizando Laboratorio REC con GitHub...</div>
+    <img src="icon.png" alt="Logo REC" class="logo">
+    
+    <div id="status">Iniciando Laboratorio REC...</div>
+    <div class="loader" id="spinner"></div>
+    
+    <button id="btnEntrar">ENTRAR AL LABORATORIO</button>
 
     <script>
-        // 1. REGISTRO DEL SERVICE WORKER (Para permitir la instalación PWA)
+        // 1. REGISTRO DEL SERVICE WORKER
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW registrado', reg))
-                    .catch(err => console.log('Error al registrar SW', err));
-            });
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('REC SW Activo'))
+                .catch(err => console.error('Error SW:', err));
         }
 
-        // 2. LÓGICA DE REDIRECCIÓN HACIA TURBOWARP
-        const user = "ROBOTICAENCOLEGIOS";
-        const repo = "ia-robotica";
-        const base = `https://${user}.github.io/${repo}/`;
-        
-        // Evita versiones viejas de los archivos JS
-        const v = Date.now(); 
+        const statusText = document.getElementById('status');
+        const btn = document.getElementById('btnEntrar');
+        const spinner = document.getElementById('spinner');
 
-        const fileNames = [
-            "extensionpcb.js",
-            "iamanos.js",
-            "senialestransito.js",
-            "vozatexto.js"
-        ];
+        function lanzarEditor() {
+            const user = "ROBOTICAENCOLEGIOS";
+            const repo = "ia-robotica";
+            const base = `https://${user}.github.io/${repo}/`;
+            const v = Date.now(); 
 
-        // Crear URLs con parámetros anti-caché
-        const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
+            const fileNames = ["extensionpcb.js", "iamanos.js", "senialestransito.js", "vozatexto.js"];
+            const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
+            const params = extensions.map(url => `extension=${encodeURIComponent(url)}`).join('&');
+            
+            // Redirigir al editor
+            window.location.href = `https://turbowarp.org/editor?${params}`;
+        }
 
-        // Construir los parámetros para TurboWarp
-        const params = extensions.map(url => `extension=${encodeURIComponent(url)}`).join('&');
-        
-        // URL final del editor
-        const twUrl = `https://turbowarp.org/editor?${params}`;
+        // Detectar si la app ya se está ejecutando como PWA instalada
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-        // Redirección con reemplazo de historial para mejorar la experiencia PWA
-        setTimeout(() => {
-            window.location.replace(twUrl);
-        }, 1200);
+        if (isPWA) {
+            // Si es PWA, iniciamos automático para que parezca una app nativa
+            statusText.innerText = "Sincronizando con el Robot...";
+            setTimeout(lanzarEditor, 1500);
+        } else {
+            // Si está en el navegador, pedimos interacción (esto ayuda con los permisos)
+            statusText.innerText = "Laboratorio REC - IA & Robótica";
+            spinner.style.display = "none";
+            btn.style.display = "block";
+            btn.onclick = lanzarEditor;
+        }
     </script>
 </body>
 </html>
