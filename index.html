@@ -50,9 +50,9 @@
         // Creamos la lista de extensiones con el truco anti-caché (?v=...)
         const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
 
-        // IMPORTANTE: Para modo Unsandboxed se usa el parámetro 'unsandboxed-extension'
-        // Cada extensión debe llevar su propio parámetro.
-        const params = extensions.map(url => `unsandboxed-extension=${encodeURIComponent(url)}`).join('&');
+        // IMPORTANTE: TurboWarp usa el parámetro 'extension' para todas las extensiones
+        // El modo unsandboxed se maneja automáticamente con // @turbowarp-force-unsandboxed
+        const params = extensions.map(url => `extension=${encodeURIComponent(url)}`).join('&');
         
         const twUrl = `https://turbowarp.org/editor?${params}`;
 
