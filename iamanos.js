@@ -7,10 +7,6 @@
 (function (Scratch) {
   'use strict';
 
-  if (!Scratch.extensions.unsandboxed) {
-    throw new Error('Debe ejecutarse en modo unsandboxed.');
-  }
-
   class IAVisionRECPro {
     constructor() {
       this.video = null;
