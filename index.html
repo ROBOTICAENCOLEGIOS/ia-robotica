@@ -2,108 +2,111 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REC - Laboratorio de IA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>REC - Laboratorio de IA y Robótica</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#EAB308">
     <link rel="apple-touch-icon" href="icon.png">
 
     <style>
-        body { 
-            background: #000; 
-            color: #fff; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            text-align: center;
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #111;
+            font-family: 'Segoe UI', system-ui, sans-serif;
         }
-        .logo {
-            width: 150px;
-            height: 150px;
-            margin-bottom: 20px;
-            object-fit: contain;
+
+        /* Pantalla de carga */
+        #splash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; z-index: 9999; background: #000;
+            transition: opacity 0.5s ease-out;
         }
-        .loader { 
-            border: 4px solid #333; 
-            border-top: 4px solid #eab308; 
-            border-radius: 50%; 
-            width: 40px; 
-            height: 40px; 
-            animation: spin 1s linear infinite; 
-            margin: 20px auto;
+        .logo { width: 120px; height: 120px; margin-bottom: 20px; }
+        .loader-bar {
+            width: 200px; height: 4px; background: #333;
+            border-radius: 2px; overflow: hidden;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #status { font-weight: bold; color: #eab308; padding: 0 20px; font-size: 1.2rem; }
-        
-        button {
-            margin-top: 25px;
-            padding: 15px 40px;
-            background: #eab308;
-            color: #000;
-            border: none;
-            border-radius: 30px;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            display: none; /* Se muestra solo si no es PWA */
-            transition: transform 0.2s;
+        .progress {
+            width: 0%; height: 100%; background: #EAB308;
+            transition: width 0.3s;
         }
-        button:active { transform: scale(0.95); }
+        #status-text { color: #EAB308; margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
+
+        /* El Editor */
+        iframe {
+            border: none; width: 100%; height: 100%;
+            display: none; /* Se muestra al cargar */
+        }
     </style>
 </head>
 <body>
-    <img src="icon.png" alt="Logo REC" class="logo">
-    
-    <div id="status">Iniciando Laboratorio REC...</div>
-    <div class="loader" id="spinner"></div>
-    
-    <button id="btnEntrar">ENTRAR AL LABORATORIO</button>
+
+    <div id="splash">
+        <img src="icon.png" class="logo" alt="REC Logo">
+        <div class="loader-bar"><div class="progress" id="bar"></div></div>
+        <div id="status-text">INICIANDO LABORATORIO...</div>
+    </div>
+
+    <iframe 
+        id="editor"
+        src="https://turbowarp.org/editor?embed" 
+        allow="serial; camera; microphone; bluetooth; display-capture"
+        allowfullscreen>
+    </iframe>
 
     <script>
-        // 1. REGISTRO DEL SERVICE WORKER
+        const splash = document.getElementById('splash');
+        const bar = document.getElementById('bar');
+        const status = document.getElementById('status-text');
+        const iframe = document.getElementById('editor');
+
+        // Registro de Service Worker para PWA
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log('REC SW Activo'))
-                .catch(err => console.error('Error SW:', err));
+            navigator.serviceWorker.register('./sw.js');
         }
 
-        const statusText = document.getElementById('status');
-        const btn = document.getElementById('btnEntrar');
-        const spinner = document.getElementById('spinner');
+        // Simulación de carga y comunicación
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            bar.style.width = progress + '%';
+        }, 200);
 
-        function lanzarEditor() {
-            const user = "ROBOTICAENCOLEGIOS";
-            const repo = "ia-robotica";
-            const base = `https://${user}.github.io/${repo}/`;
-            const v = Date.now(); 
-
-            const fileNames = ["extensionpcb.js", "iamanos.js", "senialestransito.js", "vozatexto.js"];
-            const extensions = fileNames.map(file => `${base}${file}?v=${v}`);
-            const params = extensions.map(url => `extension=${encodeURIComponent(url)}`).join('&');
+        iframe.onload = () => {
+            bar.style.width = '100%';
+            status.innerText = "CONFIGURANDO BLOQUES REC...";
             
-            // Redirigir al editor
-            window.location.href = `https://turbowarp.org/editor?${params}`;
-        }
-
-        // Detectar si la app ya se está ejecutando como PWA instalada
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-        if (isPWA) {
-            // Si es PWA, iniciamos automático para que parezca una app nativa
-            statusText.innerText = "Sincronizando con el Robot...";
-            setTimeout(lanzarEditor, 1500);
-        } else {
-            // Si está en el navegador, pedimos interacción (esto ayuda con los permisos)
-            statusText.innerText = "Laboratorio REC - IA & Robótica";
-            spinner.style.display = "none";
-            btn.style.display = "block";
-            btn.onclick = lanzarEditor;
-        }
+            // PEQUEÑO TRUCO: Inyectamos el loader.js dentro del iframe
+            // Para que el loader tenga acceso al VM del editor
+            try {
+                const script = document.createElement('script');
+                script.src = "./loader.js?v=" + Date.now();
+                // Intentamos acceder al contenido del iframe (esto requiere que el loader use postMessage o sea inyectado)
+                // Como turbowarp.org y github son dominios distintos, usaremos un puente de URL
+                
+                // ACTUALIZACIÓN DE ESTRATEGIA:
+                // Como el iframe es de otro dominio, no podemos inyectar JS directo por seguridad.
+                // Entonces, pasamos el loader como una extensión más en la URL:
+                const loaderUrl = window.location.href.replace('index.html', '') + 'loader.js';
+                const finalTwUrl = `https://turbowarp.org/editor?extension=${encodeURIComponent(loaderUrl)}`;
+                
+                iframe.src = finalTwUrl;
+                
+                setTimeout(() => {
+                    splash.style.opacity = '0';
+                    iframe.style.display = 'block';
+                    setTimeout(() => splash.remove(), 500);
+                }, 2000);
+            } catch (e) {
+                console.error("Error de cross-origin, usando fallback...");
+                splash.remove();
+                iframe.style.display = 'block';
+            }
+            clearInterval(interval);
+        };
     </script>
 </body>
 </html>
