@@ -1,14 +1,11 @@
-﻿/**
+﻿// @shards unsandboxed
+/**
  * IA: Visión REC Pro - VERSIÓN CORREGIDA
  * Soluciona el problema de variables que no actualizan.
  */
 
 (function (Scratch) {
   'use strict';
-
-  if (!Scratch.extensions.unsandboxed) {
-    throw new Error('Debe ejecutarse en modo unsandboxed.');
-  }
 
   class IAVisionRECPro {
     constructor() {
@@ -38,7 +35,7 @@
     getInfo() {
       return {
         id: 'iaVisionRECPro',
-        name: 'IA: Visión REC Pro',
+        name: '@roboticaencolegios - IA Visión Manos',
         color1: '#FF5733',
         blocks: [
           { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER cámara e IA' },

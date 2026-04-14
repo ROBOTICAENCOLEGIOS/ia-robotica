@@ -1,3 +1,4 @@
+// @shards unsandboxed
 (function (Scratch) {
   'use strict';
 
@@ -37,7 +38,7 @@
     getInfo() {
       return {
         id: 'iaSenalesTransitoV7',
-        name: 'IA Señales de Tránsito',
+        name: '@roboticaencolegios - IA Señales de Tránsito',
         color1: '#EAB308',
         blocks: [
           { opcode: 'loadFiles', blockType: Scratch.BlockType.COMMAND, text: '🌐 CARGAR MODELO DE TRÁNSITO' },
