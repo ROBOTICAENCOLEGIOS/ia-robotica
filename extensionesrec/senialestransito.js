@@ -76,27 +76,20 @@
     }
 
     async loadFiles() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.multiple = true;
-      input.onchange = async (e) => {
-        const files = Array.from(e.target.files);
-        const modelFile = files.find(f => f.name.includes('model.json'));
-        const weightsFile = files.find(f => f.name.includes('weights.bin'));
-        const metadataFile = files.find(f => f.name.includes('metadata.json'));
-        if (!modelFile || !weightsFile || !metadataFile) {
-          alert("Selecciona los 3 archivos juntos (model, weights y metadata)");
-          return;
-        }
-        try {
-          this.prediction = "LEYENDO ARCHIVOS...";
-          setTimeout(async () => {
-            this.model = await tmImage.loadFromFiles(modelFile, weightsFile, metadataFile);
-            this.prediction = "MODELO CARGADO OK";
-          }, 500);
-        } catch (err) { this.prediction = "ERROR AL PROCESAR"; }
-      };
-      input.click();
+      try {
+        this.prediction = "CARGANDO MODELO DESDE CDN...";
+        
+        // Cargar modelo automáticamente desde CDN
+        const modelURL = 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/extensionesrec/modelo_transito/model.json';
+        
+        setTimeout(async () => {
+          this.model = await tmImage.load(modelURL);
+          this.prediction = "MODELO CARGADO OK";
+        }, 500);
+      } catch (err) { 
+        console.error("Error cargando modelo desde CDN:", err);
+        this.prediction = "ERROR AL CARGAR MODELO"; 
+      }
     }
 
     async start() {
