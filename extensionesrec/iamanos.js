@@ -38,30 +38,30 @@
     getInfo() {
       return {
         id: 'iaVisionRECPro',
-        name: 'IA: Visión REC Pro',
+        name: 'IA: Vision REC Pro',
         color1: '#FF5733',
         blocks: [
-          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER cámara e IA' },
-          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR cámara' },
+          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER camara e IA' },
+          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR camara' },
           { opcode: 'getStatus', blockType: Scratch.BlockType.REPORTER, text: 'Estado de la IA' },
           "---",
           {
             opcode: 'setVideoPos',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover cámara a x: [X] y: [Y]',
+            text: 'Mover camara a x: [X] y: [Y]',
             arguments: { X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }, Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 } }
         ,
           {
             opcode: 'setVideoSize',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamaño de cámara al [SIZE] %',
+            text: 'Tamano de camara al [SIZE] %',
             arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
         ,
           "---",
           { opcode: 'getFaces', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
           { opcode: 'getHands', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
-          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: '¿dedos pellizcando?' },
-          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posición X dedo índice' }
+          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: 'dedos pellizcando?' },
+          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posicion X dedo indice' }
         ]
     ;
   
