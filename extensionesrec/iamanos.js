@@ -1,5 +1,5 @@
 /**
- * IA: Visión REC Pro - VERSIÓN CORREGIDA
+ * IA: Vision REC Pro - VERSION LIMPIA SIN ACENTOS
  * Soluciona el problema de variables que no actualizan.
  */
 
