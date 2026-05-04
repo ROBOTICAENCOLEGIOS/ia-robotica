@@ -1,5 +1,5 @@
-Ôªø/**
- * IA: Visi√≥n REC Pro - VERSI√ìN CORREGIDA
+/**
+ * IA: VisiÛn REC Pro - VERSI”N CORREGIDA
  * Soluciona el problema de variables que no actualizan.
  */
 
@@ -38,30 +38,30 @@
     getInfo() {
       return {
         id: 'iaVisionRECPro',
-        name: 'IA: Visi√≥n REC Pro',
+        name: 'IA: VisiÛn REC Pro',
         color1: '#FF5733',
         blocks: [
-          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER c√°mara e IA' },
-          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR c√°mara' },
+          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER c·mara e IA' },
+          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR c·mara' },
           { opcode: 'getStatus', blockType: Scratch.BlockType.REPORTER, text: 'Estado de la IA' },
           "---",
           {
             opcode: 'setVideoPos',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover c√°mara a x: [X] y: [Y]',
+            text: 'Mover c·mara a x: [X] y: [Y]',
             arguments: { X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }, Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 } }
           },
           {
             opcode: 'setVideoSize',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Tama√±o de c√°mara al [SIZE] %',
+            text: 'TamaÒo de c·mara al [SIZE] %',
             arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
           },
           "---",
           { opcode: 'getFaces', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
           { opcode: 'getHands', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
-          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: '¬ødedos pellizcando?' },
-          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posici√≥n X dedo √≠ndice' }
+          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: 'ødedos pellizcando?' },
+          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posiciÛn X dedo Ìndice' }
         ]
       };
     }
@@ -84,7 +84,7 @@
         });
         document.body.appendChild(this.video);
 
-        // Forzar carga de modelos si no est√°n listos
+        // Forzar carga de modelos si no est·n listos
         const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
 
@@ -96,7 +96,7 @@
           this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
           if (this.handsDetected > 0) {
             const h = results.multiHandLandmarks[0]; // Usar la primera mano detectada
-            // El punto 8 es la punta del √≠ndice, el 4 es la punta del pulgar
+            // El punto 8 es la punta del Ìndice, el 4 es la punta del pulgar
             const dist = Math.sqrt(
               Math.pow(h[4].x - h[8].x, 2) + 
               Math.pow(h[4].y - h[8].y, 2)
@@ -126,7 +126,7 @@
         this.status = "Listo para detectar";
       } catch (err) {
         console.error(err);
-        this.status = "Error: Sin c√°mara";
+        this.status = "Error: Sin c·mara";
       }
     }
 

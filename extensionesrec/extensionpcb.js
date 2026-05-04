@@ -1,7 +1,7 @@
 /**
 TurboWarp / Scratch 3 Custom Extension — REC PCB1 ARDUINO v1.7.3
 Web Serial API @ 115200 baud. Verde Militar & Bloques Musicales. */ (function (Scratch) { 'use strict';
-if (!Scratch.extensions.unsandboxed) { throw new Error('Esta extension debe ejecutarse sin sandbox (unsandboxed).'); }
+
 class RecPcb1Arduino { constructor(runtime) { this.runtime = runtime; this.port = null; this._activePort = null; this.encoder = new TextEncoder(); this.decoder = new TextDecoder(); this._rxRemainder = ''; this._lineWaiters = []; this._readLoopRunning = false; this._serialQueue = Promise.resolve();
   this._distanceEma = null;
   this._distanceLastMs = 0;
