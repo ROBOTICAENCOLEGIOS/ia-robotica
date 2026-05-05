@@ -1,63 +1,86 @@
 /**
- * IA: Vision REC Pro - VERSION LIMPIA SIN ACENTOS
- * Soluciona el problema de variables que no actualizan.
+ * IA: Visión REC Pro - VERSIÓN ESTABLE
+ * Solución al error 'window.Hands is not a constructor' y limpieza de bloques.
  */
 
 (function (Scratch) {
   'use strict';
 
+  if (!Scratch.extensions.unsandboxed) {
+    throw new Error('Debe ejecutarse en modo unsandboxed.');
+  }
+
   class IAVisionRECPro {
     constructor() {
       this.video = null;
-      this.model = null;
       this.status = "Apagado";
-      this.faceCount = 0;
-      this.handCount = 0;
+      this.facesDetected = 0;
+      this.handsDetected = 0;
       this.isPinching = false;
       this.indexX = 0;
       this.indexY = 0;
-      this.videoX = 10;
-      this.videoY = 10;
-      this.videoSize = 40;
+    }
+
+    // Función para asegurar que las librerías externas existan antes de usarlas
+    async _ensureLibraries() {
+      if (window.Hands && window.FaceMesh && window.Camera) return true;
+      
+      this.status = "Cargando librerías...";
+      const scripts = [
+        "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+        "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+        "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      ];
+
+      await Promise.all(scripts.map(url => {
+        return new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = url;
+          script.onload = resolve;
+          document.head.appendChild(script);
+        });
+      }));
     }
 
     getInfo() {
       return {
         id: 'iaVisionRECPro',
-        name: 'IA: Vision REC Pro',
+        name: 'IA: Visión REC Pro',
         color1: '#FF5733',
         blocks: [
-          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER camara e IA' },
-          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR camara' },
+          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER cámara e IA' },
+          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR cámara' },
           { opcode: 'getStatus', blockType: Scratch.BlockType.REPORTER, text: 'Estado de la IA' },
           "---",
           {
             opcode: 'setVideoPos',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover camara a x: [X] y: [Y]',
+            text: 'Mover cámara a x: [X] y: [Y]',
             arguments: { X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }, Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 } }
           },
           {
             opcode: 'setVideoSize',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamano de camara al [PCT] %',
-            arguments: { PCT: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
+            text: 'Tamaño de cámara al [SIZE] %',
+            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
           },
           "---",
           { opcode: 'getFaces', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
           { opcode: 'getHands', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
-          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: 'dedos pellizcando?' },
-          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posicion X dedo indice' },
-          { opcode: 'getIndexY', blockType: Scratch.BlockType.REPORTER, text: 'posicion Y dedo indice' }
+          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: '¿dedos pellizcando?' },
+          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posición X dedo índice' },
+          { opcode: 'getIndexY', blockType: Scratch.BlockType.REPORTER, text: 'posición Y dedo índice' }
         ]
       };
     }
 
     async iniciarIA() {
       if (this.video) return;
-      this.status = "Cargando cerebro...";
-
+      
       try {
+        await this._ensureLibraries(); // Forzar carga antes de instanciar
+        
+        this.status = "Iniciando cámara...";
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
         this.video = document.createElement('video');
         this.video.srcObject = stream;
@@ -66,124 +89,72 @@
 
         Object.assign(this.video.style, {
           position: 'fixed', zIndex: '1000', border: '3px solid #FF5733',
-          borderRadius: '10px', left: '10px', top: '10px', width: '240px',
-          pointerEvents: 'none', transform: 'scaleX(-1)' // Espejo para que sea intuitivo
+          borderRadius: '10px', left: '10px', top: '10px', width: '240px', 
+          pointerEvents: 'none', transform: 'scaleX(-1)'
         });
         document.body.appendChild(this.video);
 
-        // Forzar carga de modelos si no están listos
         const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        const faceDetection = new window.FaceDetection({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`});
+        const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
 
-        hands.setOptions({
-          maxNumHands: 2,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5 });
+        faceMesh.setOptions({ maxNumFaces: 4, refineLandmarks: true, minDetectionConfidence: 0.5 });
+
+        hands.onResults((results) => {
+          this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+          if (this.handsDetected > 0) {
+            const h = results.multiHandLandmarks[0];
+            const dist = Math.sqrt(Math.pow(h[4].x - h[8].x, 2) + Math.pow(h[4].y - h[8].y, 2));
+            this.isPinching = dist < 0.08; 
+            this.indexX = (0.5 - h[8].x) * 480;
+            this.indexY = (0.5 - h[8].y) * 360;
+          } else {
+            this.isPinching = false;
+          }
         });
 
-        faceDetection.setOptions({
-          model: 'short_range',
-          minDetectionConfidence: 0.5
+        faceMesh.onResults((results) => {
+          this.facesDetected = results.multiFaceLandmarks ? results.multiFaceLandmarks.length : 0;
         });
 
-        this.model = { hands, faceDetection };
-        this.status = "Activo";
-        this.detectLoop();
+        const camera = new window.Camera(this.video, {
+          onFrame: async () => {
+            if (this.video && this.video.readyState >= 2) {
+              await hands.send({image: this.video});
+              await faceMesh.send({image: this.video});
+            }
+          },
+          width: 480, height: 360
+        });
+        camera.start();
 
+        this.status = "Listo";
       } catch (err) {
-        console.error('Error al iniciar IA:', err);
-        this.status = "Error: " + err.message;
+        console.error(err);
+        this.status = "Error: Sin cámara";
       }
     }
 
     detenerIA() {
-      if (this.video && this.video.srcObject) {
-        this.video.srcObject.getTracks().forEach(track => track.stop());
-        document.body.removeChild(this.video);
+      if (this.video) {
+        this.video.srcObject.getTracks().forEach(t => t.stop());
+        this.video.remove();
         this.video = null;
       }
-      this.model = null;
       this.status = "Apagado";
-      this.faceCount = 0;
-      this.handCount = 0;
+      this.facesDetected = 0;
+      this.handsDetected = 0;
       this.isPinching = false;
-      this.indexX = 0;
-      this.indexY = 0;
     }
 
-    async detectLoop() {
-      if (!this.video || !this.model) return;
-
-      const resultsHands = await this.model.hands.send({image: this.video});
-      const resultsFace = await this.model.faceDetection.send({image: this.video});
-
-      // Actualizar manos
-      this.handCount = resultsHands.multiHandLandmarks ? resultsHands.multiHandLandmarks.length : 0;
-      this.isPinching = false;
-      this.indexX = 0;
-      this.indexY = 0;
-
-      if (resultsHands.multiHandLandmarks) {
-        for (const landmarks of resultsHands.multiHandLandmarks) {
-          // Detectar pellizco (pulgar e índice)
-          const thumb = landmarks[4];
-          const index = landmarks[8];
-          const distance = Math.sqrt(Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2));
-          if (distance < 0.05) this.isPinching = true;
-
-          // Actualizar posición del índice
-          this.indexX = Math.round(index.x * 100);
-          this.indexY = Math.round(index.y * 100);
-        }
-      }
-
-      // Actualizar rostros
-      this.faceCount = resultsFace.detections ? resultsFace.detections.length : 0;
-
-      requestAnimationFrame(() => this.detectLoop());
-    }
-
-    getStatus() {
-      return this.status;
-    }
-
-    getFaces() {
-      return this.faceCount;
-    }
-
-    getHands() {
-      return this.handCount;
-    }
-
-    getPinch() {
-      return this.isPinching;
-    }
-
-    getIndexX() {
-      return this.indexX;
-    }
-
-    getIndexY() {
-      return this.indexY;
-    }
-
-    setVideoPos(args) {
-      this.videoX = args.X;
-      this.videoY = args.Y;
-      if (this.video) {
-        this.video.style.left = this.videoX + 'px';
-        this.video.style.top = this.videoY + 'px';
-      }
-    }
-
-    setVideoSize(args) {
-      this.videoSize = args.PCT;
-      if (this.video) {
-        const width = 480 * (this.videoSize / 100);
-        this.video.style.width = width + 'px';
-      }
-    }
+    setVideoPos(args) { if (this.video) { this.video.style.left = args.X + 'px'; this.video.style.top = args.Y + 'px'; } }
+    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
+    getStatus() { return this.status; }
+    getFaces() { return this.facesDetected; }
+    getHands() { return this.handsDetected; }
+    getPinch() { return this.isPinching; }
+    getIndexX() { return Math.round(this.indexX); }
+    getIndexY() { return Math.round(this.indexY); }
   }
 
   Scratch.extensions.register(new IAVisionRECPro());
