@@ -7,6 +7,7 @@
       this.isListening = false;
       this.recognition = null;
       this._setupSpeech();
+    }
 
     getInfo() {
       return {
@@ -39,8 +40,9 @@
             opcode: 'isMicrophoneActive',
             blockType: Scratch.BlockType.BOOLEAN,
             text: '¿escuchando?'
-        ]
+        }]
       };
+    }
 
     _setupSpeech() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -62,6 +64,8 @@
 
         this.recognition.onerror = () => { this.isListening = false; };
         this.recognition.onend = () => { this.isListening = false; };
+      }
+    }
 
     startListening() {
       if (this.recognition && !this.isListening) {
@@ -69,19 +73,28 @@
           this.recognition.start();
         } catch (e) {
           console.error(e);
+        }
+      }
+    }
 
     stopListening() {
       if (this.recognition && this.isListening) {
         this.recognition.stop();
+      }
+    }
 
     clearSpeech() {
       this.speechResult = "";
+    }
 
     isMicrophoneActive() {
       return this.isListening;
+    }
 
     getLastSpeech() {
       return this.speechResult;
+    }
+  }
 
   Scratch.extensions.register(new VozATexto());
 })(Scratch);
