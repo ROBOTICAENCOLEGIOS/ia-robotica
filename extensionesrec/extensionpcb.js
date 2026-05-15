@@ -1,6 +1,10 @@
 /**
-TurboWarp / Scratch 3 Custom Extension — REC PCB1 ARDUINO v1.7.3
+TurboWarp / Scratch 3 Custom Extension — REC PCB1 ARDUINO v2.0 (GOLDEN BACKUP)
 Web Serial API @ 115200 baud. Verde Militar & Bloques Musicales. */ (function (Scratch) { 'use strict';
+
+if (!Scratch.extensions.unsandboxed) {
+  throw new Error('Esta extension debe ejecutarse sin sandbox (unsandboxed) para acceder al puerto serial.');
+}
 
 class RecPcb1Arduino { constructor(runtime) { this.runtime = runtime; this.port = null; this._activePort = null; this.encoder = new TextEncoder(); this.decoder = new TextDecoder(); this._rxRemainder = ''; this._lineWaiters = []; this._readLoopRunning = false; this._serialQueue = Promise.resolve();
   this._distanceEma = null;
@@ -26,40 +30,63 @@ getInfo() {
         opcode: 'moveForward',
         blockType: Scratch.BlockType.COMMAND,
         text: 'Mover motor [SIDE] hacia ADELANTE a [PCT]%',
-        arguments: { SIDE: { type: 'string', menu: 'motorSide' }, PCT: { type: 'number', defaultValue: 50 } }
+        arguments: { 
+          SIDE: { type: Scratch.ArgumentType.STRING, menu: 'motorSide', defaultValue: 'IZQ' }, 
+          PCT: { type: Scratch.ArgumentType.NUMBER, defaultValue: 50 } 
+        }
       },
       {
         opcode: 'moveBackward',
         blockType: Scratch.BlockType.COMMAND,
         text: 'Mover motor [SIDE] hacia ATRAS a [PCT]%',
-        arguments: { SIDE: { type: 'string', menu: 'motorSide' }, PCT: { type: 'number', defaultValue: 50 } }
+        arguments: { 
+          SIDE: { type: Scratch.ArgumentType.STRING, menu: 'motorSide', defaultValue: 'IZQ' }, 
+          PCT: { type: Scratch.ArgumentType.NUMBER, defaultValue: 50 } 
+        }
       },
       {
         opcode: 'stopMotor',
         blockType: Scratch.BlockType.COMMAND,
         text: 'Detener motor [WHICH]',
-        arguments: { WHICH: { type: 'string', menu: 'stopWhich' } }
+        arguments: { 
+          WHICH: { type: Scratch.ArgumentType.STRING, menu: 'stopWhich', defaultValue: 'AMBOS' } 
+        }
       },
       '---',
       {
         opcode: 'lightOn',
         blockType: Scratch.BlockType.COMMAND,
         text: 'Encender Luz [LED] en color [COLOR]',
-        arguments: { LED: { type: 'string', menu: 'ledWhich' }, COLOR: { type: 'color' } }
+        arguments: { 
+          LED: { type: Scratch.ArgumentType.STRING, menu: 'ledWhich', defaultValue: 'TODAS' }, 
+          COLOR: { type: Scratch.ArgumentType.COLOR, defaultValue: '#ff0000' } 
+        }
       },
-      { opcode: 'lightOff', blockType: Scratch.BlockType.COMMAND, text: 'Apagar Luz [LED]', arguments: { LED: { type: 'string', menu: 'ledWhich' } } },
+      { 
+        opcode: 'lightOff', 
+        blockType: Scratch.BlockType.COMMAND, 
+        text: 'Apagar Luz [LED]', 
+        arguments: { 
+          LED: { type: Scratch.ArgumentType.STRING, menu: 'ledWhich', defaultValue: 'TODAS' } 
+        } 
+      },
       {
         opcode: 'playNote',
         blockType: Scratch.BlockType.COMMAND,
         text: 'Tocar nota [NOTE] por [MS] ms',
-        arguments: { NOTE: { type: 'number', menu: 'musicalNotes', defaultValue: 262 }, MS: { type: 'number', defaultValue: 500 } }
+        arguments: { 
+          NOTE: { type: Scratch.ArgumentType.NUMBER, menu: 'musicalNotes', defaultValue: 262 }, 
+          MS: { type: Scratch.ArgumentType.NUMBER, defaultValue: 500 } 
+        }
       },
       '---',
       {
         opcode: 'getDHT',
         blockType: Scratch.BlockType.REPORTER,
         text: 'Obtener [TIPO]',
-        arguments: { TIPO: { type: 'string', menu: 'dhtMenu' } }
+        arguments: { 
+          TIPO: { type: Scratch.ArgumentType.STRING, menu: 'dhtMenu', defaultValue: 'TEMP' } 
+        }
       },
       { opcode: 'distanceCm', blockType: Scratch.BlockType.REPORTER, text: 'Distancia en cm' },
       { opcode: 'lineDetected', blockType: Scratch.BlockType.BOOLEAN, text: 'Detecta linea' }
@@ -84,13 +111,16 @@ _connected() { return !!(this._activePort && this._activePort.readable && this._
 checkConnection() { return this._connected() ? 'Connected' : 'Disconnected'; }
 
 async connectRobot() {
-  this.port = await navigator.serial.requestPort();
   try {
+    this.port = await navigator.serial.requestPort();
     await this._disconnect();
     this._activePort = this.port;
     await this._activePort.open({ baudRate: 115200 });
     this._startReadLoop();
-  } catch (e) { this._activePort = null; }
+  } catch (e) { 
+    console.error("Error al conectar:", e);
+    this._activePort = null; 
+  }
 }
 
 async _disconnect() {
@@ -170,15 +200,35 @@ async _setMotor(side, value) {
 
 async moveForward(args) { await this._setMotor(args.SIDE, Math.round((Math.abs(args.PCT) / 100) * 255)); }
 async moveBackward(args) { await this._setMotor(args.SIDE, Math.round((Math.abs(args.PCT) / 100) * 255) * -1); }
+
 async stopMotor(args) {
   if (args.WHICH === 'AMBOS') {
-    this._lastMotorValue['IZQ'] = 0; this._lastMotorValue['DER'] = 0;
-    await this._sendLine('AT+MOTOR=STOP');
-  } else { await this._setMotor(args.WHICH, 0); }
+    await this._setMotor('IZQ', 0);
+    await this._setMotor('DER', 0);
+  } else { 
+    await this._setMotor(args.WHICH, 0); 
+  }
 }
 
-async lightOn(args) { const rgb = this._hexToRgb(args.COLOR); await this._sendLine(`AT+LED${args.LED}=${rgb.r},${rgb.g},${rgb.b}`); }
-async lightOff(args) { await this._sendLine(`AT+LED${args.LED}=0,0,0`); }
+async lightOn(args) { 
+  const rgb = this._hexToRgb(args.COLOR); 
+  if (args.LED === 'TODAS') {
+    await this._sendLine(`AT+LED1=${rgb.r},${rgb.g},${rgb.b}`);
+    await this._sendLine(`AT+LED2=${rgb.r},${rgb.g},${rgb.b}`);
+  } else {
+    await this._sendLine(`AT+LED${args.LED}=${rgb.r},${rgb.g},${rgb.b}`); 
+  }
+}
+
+async lightOff(args) { 
+  if (args.LED === 'TODAS') {
+    await this._sendLine(`AT+LED1=0,0,0`);
+    await this._sendLine(`AT+LED2=0,0,0`);
+  } else {
+    await this._sendLine(`AT+LED${args.LED}=0,0,0`); 
+  }
+}
+
 async playNote(args) { await this._sendLine(`AT+NOTE=${Math.round(args.NOTE)},${Math.max(0, Math.round(args.MS))}`); }
 
 async getDHT(args) {
