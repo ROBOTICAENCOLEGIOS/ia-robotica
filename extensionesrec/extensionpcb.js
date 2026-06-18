@@ -1,5 +1,5 @@
-/**
-TurboWarp / Scratch 3 Custom Extension — REC PCB1 ARDUINO v2.0 (GOLDEN BACKUP)
+ï»¿/**
+TurboWarp / Scratch 3 Custom Extension ï¿½ REC PCB1 ARDUINO v2.0 (GOLDEN BACKUP)
 Web Serial API @ 115200 baud. Verde Militar & Bloques Musicales. */ (function (Scratch) { 'use strict';
 
 if (!Scratch.extensions.unsandboxed) {
@@ -23,7 +23,7 @@ getInfo() {
     color2: '#3d441a',
     color3: '#2f3514',
     blocks: [
-      { opcode: 'connectRobot', blockType: Scratch.BlockType.COMMAND, text: 'Conectar Robot' },
+      { func: 'connectRobot', blockType: Scratch.BlockType.BUTTON, text: 'Conectar Robot', callFunc: this.connectRobot.bind(this) },
       { opcode: 'checkConnection', blockType: Scratch.BlockType.REPORTER, text: 'Check Connection' },
       '---',
       {
