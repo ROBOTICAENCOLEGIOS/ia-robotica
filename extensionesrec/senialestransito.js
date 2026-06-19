@@ -60,6 +60,12 @@
               Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }
             }
           },
+          {
+            opcode: 'setVideoSize',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'Tamaño de cámara al [SIZE] %',
+            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
+          },
           "---",
           { opcode: 'getSignal', blockType: Scratch.BlockType.REPORTER, text: 'señal detectada' },
           { opcode: 'getConf', blockType: Scratch.BlockType.REPORTER, text: 'exactitud %' },
@@ -130,6 +136,8 @@
         this.prediction = "CÁMARA APAGADA";
       }
     }
+
+    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
 
     setPos(args) {
       this.posX = args.X;
