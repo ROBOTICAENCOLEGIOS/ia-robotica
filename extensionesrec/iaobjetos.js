@@ -1,7 +1,7 @@
 /**
- * IA: Detección de Objetos - Hito 5 Laboratorio REC
+ * IA: Detección de Objetos - RoboticaEnColegios R.E.C.
  * Detecta objetos cotidianos con COCO-SSD (TensorFlow.js).
- * Arquitectura clonada de iamanos.js / iaemociones.js.
+ * Cámara centralizada vía window.RECCamera (recCamera.js).
  */
 
 (function (Scratch) {
@@ -10,6 +10,10 @@
   if (!Scratch.extensions.unsandboxed) {
     throw new Error('Debe ejecutarse en modo unsandboxed.');
   }
+
+  const _REC_CAMERA_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? window.location.origin + '/ia-robotica/extensionesrec/recCamera.js'
+    : 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/extensionesrec/recCamera.js';
 
   // Diccionario de traducción COCO → español (80 clases COCO-SSD cubiertas)
   const _OBJ_ES = {
@@ -132,7 +136,6 @@
 
   class IAObjetosREC {
     constructor() {
-      this.video       = null;
       this.model       = null;
       this.modelReady  = false;
       this._detecting  = false;
@@ -152,12 +155,15 @@
       });
     }
 
+    async _ensureCamera() {
+      if (!window.RECCamera) await this._loadScript(_REC_CAMERA_URL);
+    }
+
     async cargarModelo() {
       if (this.modelReady) return;
       try {
         await this._loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs");
         await this._loadScript("https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd");
-        // lite_mobilenet_v2 = modelo más liviano, ideal para netbooks escolares
         this.model = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
         this.modelReady = true;
       } catch (e) {
@@ -171,24 +177,17 @@
         name: 'IA: Detección de Objetos',
         color1: '#F43F5E',
         blocks: [
-          { opcode: 'cargarModelo',  blockType: Scratch.BlockType.COMMAND, text: '⏳ CARGAR MODELO DE OBJETOS' },
-          { opcode: 'iniciarCamara', blockType: Scratch.BlockType.COMMAND, text: '📷 ENCENDER CÁMARA OBJETOS' },
+          { opcode: 'cargarModelo', blockType: Scratch.BlockType.COMMAND, text: '⏳ CARGAR MODELO DE OBJETOS' },
+          {
+            opcode: 'encenderCamara',
+            blockType: Scratch.BlockType.COMMAND,
+            text: '📷 encender cámara en modo: [MODO]',
+            arguments: { MODO: { type: Scratch.ArgumentType.STRING, menu: 'MODO_CAMARA' } }
+          },
           { opcode: 'detenerCamara', blockType: Scratch.BlockType.COMMAND, text: '❌ APAGAR CÁMARA OBJETOS' },
-          {
-            opcode: 'setVideoPos',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover cámara a x: [X] y: [Y]',
-            arguments: {
-              X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 400 },
-              Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }
-            }
-          },
-          {
-            opcode: 'setVideoSize',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamaño de cámara al [SIZE] %',
-            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
-          },
+          "---",
+          { opcode: 'getCamaraX', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada X de la cámara' },
+          { opcode: 'getCamaraY', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada Y de la cámara' },
           "---",
           { opcode: 'getObject',     blockType: Scratch.BlockType.REPORTER, text: 'objeto detectado' },
           { opcode: 'getConfidence', blockType: Scratch.BlockType.REPORTER, text: 'exactitud %' },
@@ -196,14 +195,15 @@
             opcode: 'isCategory',
             blockType: Scratch.BlockType.BOOLEAN,
             text: '¿ve categoría [CATEGORIA]?',
-            arguments: {
-              CATEGORIA: { type: Scratch.ArgumentType.STRING, menu: 'CATEGORY_MENU' }
-            }
+            arguments: { CATEGORIA: { type: Scratch.ArgumentType.STRING, menu: 'CATEGORY_MENU' } }
           },
           { opcode: 'getPosX', blockType: Scratch.BlockType.REPORTER, text: 'posición X del objeto' },
           { opcode: 'getPosY', blockType: Scratch.BlockType.REPORTER, text: 'posición Y del objeto' }
         ],
         menus: {
+          MODO_CAMARA: {
+            items: ['FLOTANTE FIJA', 'FLOTANTE ARRASTRABLE', 'FONDO DE ESCENARIO (REALIDAD AUMENTADA)']
+          },
           CATEGORY_MENU: {
             items: ['PERSONA', 'ANIMAL', 'VEH\u00CDCULO', 'COMIDA', 'ELECTR\u00d3NICA', 'MUEBLE', 'DEPORTE']
           }
@@ -211,91 +211,67 @@
       };
     }
 
-    async iniciarCamara() {
-      if (this.video) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
-        this.video = document.createElement('video');
-        this.video.srcObject = stream;
-        this.video.setAttribute('autoplay', '');
-        this.video.setAttribute('playsinline', '');
-        Object.assign(this.video.style, {
-          position: 'fixed', zIndex: '1000', border: '3px solid #F43F5E',
-          borderRadius: '10px', left: '400px', top: '10px', width: '160px',
-          pointerEvents: 'none', transform: 'scaleX(-1)'
-        });
-        document.body.appendChild(this.video);
-        this._loop();
-      } catch (err) {
-        console.error("IA Objetos: sin acceso a cámara →", err);
-      }
+    async encenderCamara(args) {
+      if (window.RECCamera && window.RECCamera.video) return;
+      await this._ensureCamera();
+      const video = await window.RECCamera.start(args.MODO, '#F43F5E');
+      if (video) this._loop();
     }
 
     detenerCamara() {
-      if (this.video) {
-        this.video.srcObject.getTracks().forEach(t => t.stop());
-        this.video.remove();
-        this.video = null;
-      }
+      this._detecting = false;
+      if (window.RECCamera) window.RECCamera.stop();
       this.object     = "NADA";
       this.confidence = 0;
       this.posX       = 0;
       this.posY       = 0;
       this._rawClass  = '';
-      this._detecting = false;
+      // Anti-crash: liberar modelo y tensores residuales de TensorFlow.js
+      if (this.model && typeof this.model.dispose === 'function') {
+        try { this.model.dispose(); } catch (e) {}
+        this.model = null;
+        this.modelReady = false;
+      }
+      try { if (window.tf) window.tf.disposeVariables(); } catch (e) {}
     }
 
-    setVideoPos(args)  { if (this.video) { this.video.style.left = args.X + 'px'; this.video.style.top = args.Y + 'px'; } }
-    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
-
     async _loop() {
-      if (!this.video) return;
+      const cam = window.RECCamera;
+      if (!cam || !cam.video) return;
 
-      // Flag anti-concurrencia: COCO-SSD puede tardar ~200-400ms en netbooks
-      if (this.modelReady && this.video.readyState >= 2 && !this._detecting) {
+      if (this.modelReady && cam.video.readyState >= 2 && !this._detecting) {
         this._detecting = true;
         try {
-          const predictions = await this.model.detect(this.video);
+          const predictions = await this.model.detect(cam.video);
 
           if (predictions && predictions.length > 0) {
-            // Objeto principal = mayor score
             const top = predictions.sort((a, b) => b.score - a.score)[0];
-
             if (top.score >= 0.4) {
               this.object     = _OBJ_ES[top.class] || top.class.toUpperCase();
               this.confidence = Math.round(top.score * 100);
               this._rawClass  = top.class;
-
-              // bbox = [x_izq, y_sup, ancho, alto] en píxeles del frame (480×360)
-              // Convertimos a coordenadas Scratch (-240/240, -180/180) con espejo en X
               const [bx, by, bw, bh] = top.bbox;
               const cx = bx + bw / 2;
               const cy = by + bh / 2;
-              this.posX = Math.round((0.5 - cx / 480) * 480); // espejo X para coincidir con video
-              this.posY = Math.round((0.5 - cy / 360) * 360); // eje Y invertido (Scratch)
+              this.posX = Math.round((0.5 - cx / 480) * 480);
+              this.posY = Math.round((0.5 - cy / 360) * 360);
             } else {
-              this.object     = "NADA";
-              this.confidence = 0;
-              this.posX       = 0;
-              this.posY       = 0;
-              this._rawClass  = '';
+              this.object = "NADA"; this.confidence = 0;
+              this.posX = 0; this.posY = 0; this._rawClass = '';
             }
           } else {
-            this.object     = "NADA";
-            this.confidence = 0;
-            this.posX       = 0;
-            this.posY       = 0;
-            this._rawClass  = '';
+            this.object = "NADA"; this.confidence = 0;
+            this.posX = 0; this.posY = 0; this._rawClass = '';
           }
-        } catch (e) {
-          // Error silencioso frame a frame
-        }
+        } catch (e) {}
         this._detecting = false;
       }
 
       requestAnimationFrame(() => this._loop());
     }
 
+    getCamaraX()    { return window.RECCamera ? Math.round(window.RECCamera.camaraX) : 0; }
+    getCamaraY()    { return window.RECCamera ? Math.round(window.RECCamera.camaraY) : 0; }
     getObject()     { return this.object; }
     getConfidence() { return this.confidence; }
     isCategory(args) { return !!this._rawClass && _CAT_MAP[this._rawClass] === args.CATEGORIA; }

@@ -1,8 +1,8 @@
 /**
- * IA: Teachable Machine - Hito 6 Laboratorio REC
+ * IA: Teachable Machine - RoboticaEnColegios R.E.C.
  * Clasifica imágenes con modelos de Google Teachable Machine.
  * Carga diferida + menús dinámicos con las clases del modelo entrenado.
- * Arquitectura clonada de iaobjetos.js.
+ * Cámara centralizada vía window.RECCamera (recCamera.js).
  */
 
 (function (Scratch) {
@@ -12,9 +12,12 @@
     throw new Error('Debe ejecutarse en modo unsandboxed.');
   }
 
+  const _REC_CAMERA_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? window.location.origin + '/ia-robotica/extensionesrec/recCamera.js'
+    : 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/extensionesrec/recCamera.js';
+
   class IATeachableREC {
     constructor() {
-      this.video         = null;
       this.model         = null;
       this._predicting   = false;
       this.modelLabels   = ['ESPERANDO MODELO'];
@@ -29,6 +32,10 @@
         script.onload = resolve;
         document.head.appendChild(script);
       });
+    }
+
+    async _ensureCamera() {
+      if (!window.RECCamera) await this._loadScript(_REC_CAMERA_URL);
     }
 
     async _ensureLibs() {
@@ -59,23 +66,16 @@
               LINK: { type: Scratch.ArgumentType.STRING, defaultValue: 'https://teachablemachine.withgoogle.com/models/XXXXX/' }
             }
           },
-          { opcode: 'iniciarCamara', blockType: Scratch.BlockType.COMMAND, text: '📷 ENCENDER CÁMARA' },
+          {
+            opcode: 'encenderCamara',
+            blockType: Scratch.BlockType.COMMAND,
+            text: '📷 encender cámara en modo: [MODO]',
+            arguments: { MODO: { type: Scratch.ArgumentType.STRING, menu: 'MODO_CAMARA' } }
+          },
           { opcode: 'detenerCamara', blockType: Scratch.BlockType.COMMAND, text: '❌ APAGAR CÁMARA' },
-          {
-            opcode: 'setVideoPos',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover cámara a x: [X] y: [Y]',
-            arguments: {
-              X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 400 },
-              Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 }
-            }
-          },
-          {
-            opcode: 'setVideoSize',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamaño de cámara al [SIZE] %',
-            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
-          },
+          "---",
+          { opcode: 'getCamaraX', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada X de la cámara' },
+          { opcode: 'getCamaraY', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada Y de la cámara' },
           "---",
           { opcode: 'getClass',      blockType: Scratch.BlockType.REPORTER, text: 'clase detectada' },
           { opcode: 'getConfidence', blockType: Scratch.BlockType.REPORTER, text: 'exactitud %' },
@@ -83,13 +83,14 @@
             opcode: 'isClass',
             blockType: Scratch.BlockType.BOOLEAN,
             text: '¿ve la clase [CLASE]?',
-            arguments: {
-              CLASE: { type: Scratch.ArgumentType.STRING, menu: 'DYNAMIC_CLASSES' }
-            }
+            arguments: { CLASE: { type: Scratch.ArgumentType.STRING, menu: 'DYNAMIC_CLASSES' } }
           },
           { opcode: 'getLabels', blockType: Scratch.BlockType.REPORTER, text: 'lista de clases entrenadas' }
         ],
         menus: {
+          MODO_CAMARA: {
+            items: ['FLOTANTE FIJA', 'FLOTANTE ARRASTRABLE', 'FONDO DE ESCENARIO (REALIDAD AUMENTADA)']
+          },
           DYNAMIC_CLASSES: {
             items: '_getDynamicLabels'
           }
@@ -138,47 +139,28 @@
       }
     }
 
-    async iniciarCamara() {
-      if (this.video) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
-        this.video = document.createElement('video');
-        this.video.srcObject = stream;
-        this.video.setAttribute('autoplay', '');
-        this.video.setAttribute('playsinline', '');
-        Object.assign(this.video.style, {
-          position: 'fixed', zIndex: '1000', border: '3px solid #8B5CF6',
-          borderRadius: '10px', left: '400px', top: '10px', width: '160px',
-          pointerEvents: 'none', transform: 'scaleX(-1)'
-        });
-        document.body.appendChild(this.video);
-        this._loop();
-      } catch (err) {
-        console.error("IA Teachable: sin acceso a cámara →", err);
-      }
+    async encenderCamara(args) {
+      if (window.RECCamera && window.RECCamera.video) return;
+      await this._ensureCamera();
+      const video = await window.RECCamera.start(args.MODO, '#8B5CF6');
+      if (video) this._loop();
     }
 
     detenerCamara() {
-      if (this.video) {
-        this.video.srcObject.getTracks().forEach(t => t.stop());
-        this.video.remove();
-        this.video = null;
-      }
+      this._predicting = false;
+      if (window.RECCamera) window.RECCamera.stop();
       this.detectedClass = "NADA";
       this.confidence    = 0;
-      this._predicting   = false;
     }
 
-    setVideoPos(args)  { if (this.video) { this.video.style.left = args.X + 'px'; this.video.style.top = args.Y + 'px'; } }
-    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
-
     async _loop() {
-      if (!this.video) return;
+      const cam = window.RECCamera;
+      if (!cam || !cam.video) return;
 
-      if (this.model && this.video.readyState >= 2 && !this._predicting) {
+      if (this.model && cam.video.readyState >= 2 && !this._predicting) {
         this._predicting = true;
         try {
-          const predictions = await this.model.predict(this.video);
+          const predictions = await this.model.predict(cam.video);
           if (predictions && predictions.length > 0) {
             const top = predictions.sort((a, b) => b.probability - a.probability)[0];
             if (top.probability >= 0.4) {
@@ -189,15 +171,15 @@
               this.confidence    = 0;
             }
           }
-        } catch (e) {
-          // Error silencioso frame a frame
-        }
+        } catch (e) {}
         this._predicting = false;
       }
 
       requestAnimationFrame(() => this._loop());
     }
 
+    getCamaraX()    { return window.RECCamera ? Math.round(window.RECCamera.camaraX) : 0; }
+    getCamaraY()    { return window.RECCamera ? Math.round(window.RECCamera.camaraY) : 0; }
     getClass()      { return this.detectedClass; }
     getConfidence() { return this.confidence; }
     isClass(args)   { return this.detectedClass === args.CLASE; }

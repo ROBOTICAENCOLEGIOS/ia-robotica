@@ -1,6 +1,7 @@
 /**
- * IA: Visión REC Pro - VERSIÓN CORREGIDA 2.0
- * Soluciona límites de manos/rostros, posición de cámara y agrega Coordenada Y.
+ * IA: Visión REC Pro - RoboticaEnColegios R.E.C.
+ * Detección de manos y rostros con MediaPipe.
+ * Cámara centralizada vía window.RECCamera (recCamera.js).
  */
 
 (function (Scratch) {
@@ -10,21 +11,21 @@
     throw new Error('Debe ejecutarse en modo unsandboxed.');
   }
 
+  const _REC_CAMERA_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? window.location.origin + '/ia-robotica/extensionesrec/recCamera.js'
+    : 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/extensionesrec/recCamera.js';
+
   class IAVisionRECPro {
     constructor() {
-      this.video = null;
-      this.status = "Apagado";
-      // Inicializamos con valores por defecto claros
+      this.status        = "Apagado";
       this.facesDetected = 0;
       this.handsDetected = 0;
-      this.isPinching = false;
-      this.indexX = 0;
-      this.indexY = 0; // Agregada la variable Y que faltaba
-      this.modelsReady = false;
-
-      this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js");
-      this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js");
-      this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
+      this.isPinching    = false;
+      this.indexX        = 0;
+      this.indexY        = 0;
+      this._running      = false;
+      this._hands        = null;
+      this._faceMesh     = null;
     }
 
     _loadScript(url) {
@@ -36,130 +37,129 @@
       });
     }
 
+    async _ensureCamera() {
+      if (!window.RECCamera) await this._loadScript(_REC_CAMERA_URL);
+    }
+
     getInfo() {
       return {
         id: 'iaVisionRECPro',
         name: 'IA: Visión REC Pro',
         color1: '#FF5733',
         blocks: [
-          { opcode: 'iniciarIA', blockType: Scratch.BlockType.COMMAND, text: '1. ENCENDER cámara e IA' },
-          { opcode: 'detenerIA', blockType: Scratch.BlockType.COMMAND, text: '2. APAGAR cámara' },
-          { opcode: 'getStatus', blockType: Scratch.BlockType.REPORTER, text: 'Estado de la IA' },
-          "---",
           {
-            opcode: 'setVideoPos',
+            opcode: 'encenderCamara',
             blockType: Scratch.BlockType.COMMAND,
-            text: 'Mover cámara a x: [X] y: [Y]',
-            // Cambiado el valor X por defecto a 400
-            arguments: { X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 400 }, Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 10 } }
+            text: '📷 encender cámara en modo: [MODO]',
+            arguments: { MODO: { type: Scratch.ArgumentType.STRING, menu: 'MODO_CAMARA' } }
           },
-          {
-            opcode: 'setVideoSize',
-            blockType: Scratch.BlockType.COMMAND,
-            text: 'Tamaño de cámara al [SIZE] %',
-            arguments: { SIZE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 40 } }
-          },
+          { opcode: 'detenerIA',  blockType: Scratch.BlockType.COMMAND,  text: '❌ APAGAR cámara e IA' },
+          { opcode: 'getStatus',  blockType: Scratch.BlockType.REPORTER, text: 'estado de la IA' },
           "---",
-          { opcode: 'getFaces', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
-          { opcode: 'getHands', blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
-          { opcode: 'getPinch', blockType: Scratch.BlockType.BOOLEAN, text: '¿dedos pellizcando?' },
-          { opcode: 'getIndexX', blockType: Scratch.BlockType.REPORTER, text: 'posición X dedo índice' },
-          // Agregado el bloque faltante para Y
-          { opcode: 'getIndexY', blockType: Scratch.BlockType.REPORTER, text: 'posición Y dedo índice' }
-        ]
+          { opcode: 'getCamaraX', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada X de la cámara' },
+          { opcode: 'getCamaraY', blockType: Scratch.BlockType.REPORTER, text: '📷 coordenada Y de la cámara' },
+          "---",
+          { opcode: 'getFaces',   blockType: Scratch.BlockType.REPORTER, text: 'cantidad de rostros' },
+          { opcode: 'getHands',   blockType: Scratch.BlockType.REPORTER, text: 'cantidad de manos' },
+          { opcode: 'getPinch',   blockType: Scratch.BlockType.BOOLEAN,  text: '¿dedos pellizcando?' },
+          { opcode: 'getIndexX',  blockType: Scratch.BlockType.REPORTER, text: 'posición X dedo índice' },
+          { opcode: 'getIndexY',  blockType: Scratch.BlockType.REPORTER, text: 'posición Y dedo índice' }
+        ],
+        menus: {
+          MODO_CAMARA: {
+            items: ['FLOTANTE FIJA', 'FLOTANTE ARRASTRABLE', 'FONDO DE ESCENARIO (REALIDAD AUMENTADA)']
+          }
+        }
       };
     }
 
-    async iniciarIA() {
-      if (this.video) return;
-      this.status = "Cargando cerebro...";
+    async encenderCamara(args) {
+      if (window.RECCamera && window.RECCamera.video) return;
+      this.status = "Cargando IA...";
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
-        this.video = document.createElement('video');
-        this.video.srcObject = stream;
-        this.video.setAttribute('autoplay', '');
-        this.video.setAttribute('playsinline', '');
+      await this._ensureCamera();
 
-        Object.assign(this.video.style, {
-          position: 'fixed', zIndex: '1000', border: '3px solid #FF5733',
-          borderRadius: '10px', left: '400px', top: '10px', width: '240px', // Cambiado left a 400px
-          pointerEvents: 'none', transform: 'scaleX(-1)' // Espejo para que sea intuitivo
-        });
-        document.body.appendChild(this.video);
+      // Cargar MediaPipe Hands y FaceMesh (sin camera_utils: ya no lo necesitamos)
+      if (!window.Hands)    await this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js");
+      if (!window.FaceMesh) await this._loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js");
 
-        // Forzar carga de modelos si no están listos
-        const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+      // Inicializar modelos
+      this._hands = new window.Hands({
+        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+      });
+      this._faceMesh = new window.FaceMesh({
+        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+      });
 
-        // Aumentados los límites de detección a 6
-        hands.setOptions({ maxNumHands: 6, modelComplexity: 1, minDetectionConfidence: 0.5 });
-        faceMesh.setOptions({ maxNumFaces: 6, refineLandmarks: true, minDetectionConfidence: 0.5 });
+      this._hands.setOptions({ maxNumHands: 6, modelComplexity: 1, minDetectionConfidence: 0.5 });
+      this._faceMesh.setOptions({ maxNumFaces: 6, refineLandmarks: true, minDetectionConfidence: 0.5 });
 
-        // CALLBACK DE MANOS CORREGIDO Y AMPLIADO
-        hands.onResults((results) => {
-          this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-          if (this.handsDetected > 0) {
-            const h = results.multiHandLandmarks[0]; // Usar la primera mano detectada
-            // El punto 8 es la punta del índice, el 4 es la punta del pulgar
-            const dist = Math.sqrt(
-              Math.pow(h[4].x - h[8].x, 2) + 
-              Math.pow(h[4].y - h[8].y, 2)
-            );
-            this.isPinching = dist < 0.08; 
-            
-            // Matemática de conversión a coordenadas Scratch
-            this.indexX = (0.5 - h[8].x) * 480; // Eje X (-240 a 240) invertido por espejo
-            this.indexY = (0.5 - h[8].y) * 360; // Eje Y (-180 a 180) agregado
-          } else {
-            this.isPinching = false;
-          }
-        });
+      this._hands.onResults((results) => {
+        this.handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+        if (this.handsDetected > 0) {
+          const h    = results.multiHandLandmarks[0];
+          const dist = Math.hypot(h[4].x - h[8].x, h[4].y - h[8].y);
+          this.isPinching = dist < 0.08;
+          this.indexX = (0.5 - h[8].x) * 480;
+          this.indexY = (0.5 - h[8].y) * 360;
+        } else {
+          this.isPinching = false;
+        }
+      });
 
-        faceMesh.onResults((results) => {
-          this.facesDetected = results.multiFaceLandmarks ? results.multiFaceLandmarks.length : 0;
-        });
+      this._faceMesh.onResults((results) => {
+        this.facesDetected = results.multiFaceLandmarks ? results.multiFaceLandmarks.length : 0;
+      });
 
-        const camera = new window.Camera(this.video, {
-          onFrame: async () => {
-            if (this.video && this.video.readyState >= 2) {
-              await hands.send({image: this.video});
-              await faceMesh.send({image: this.video});
-            }
-          },
-          width: 480, height: 360
-        });
-        camera.start();
-
+      const video = await window.RECCamera.start(args.MODO, '#FF5733');
+      if (video) {
+        this._running = true;
+        this._startLoop();
         this.status = "Listo para detectar";
-      } catch (err) {
-        console.error(err);
+      } else {
         this.status = "Error: Sin cámara";
       }
     }
 
-    detenerIA() {
-      if (this.video) {
-        this.video.srcObject.getTracks().forEach(t => t.stop());
-        this.video.remove();
-        this.video = null;
-      }
-      this.status = "Apagado";
-      this.facesDetected = 0;
-      this.handsDetected = 0;
-      this.isPinching = false;
-      this.indexX = 0;
-      this.indexY = 0; // Reseteo de la nueva variable
+    _startLoop() {
+      const loop = async () => {
+        if (!this._running || !window.RECCamera || !window.RECCamera.video) return;
+        const v = window.RECCamera.video;
+        if (v.readyState >= 2 && this._hands && this._faceMesh) {
+          try {
+            await this._hands.send({ image: v });
+            await this._faceMesh.send({ image: v });
+          } catch (e) {}
+        }
+        requestAnimationFrame(loop);
+      };
+      requestAnimationFrame(loop);
     }
 
-    setVideoPos(args) { if (this.video) { this.video.style.left = args.X + 'px'; this.video.style.top = args.Y + 'px'; } }
-    setVideoSize(args) { if (this.video) { this.video.style.width = (480 * (args.SIZE / 100)) + 'px'; } }
-    getStatus() { return this.status; }
-    getFaces() { return this.facesDetected; }
-    getHands() { return this.handsDetected; }
-    getPinch() { return this.isPinching; }
-    getIndexX() { return Math.round(this.indexX); }
-    getIndexY() { return Math.round(this.indexY); } // Método reporter agregado
+    detenerIA() {
+      this._running = false;
+      // Liberar solucionadores MediaPipe (WASM + memoria GPU/CPU)
+      try { if (this._hands)    this._hands.close();    } catch (e) {}
+      try { if (this._faceMesh) this._faceMesh.close(); } catch (e) {}
+      this._hands    = null;
+      this._faceMesh = null;
+      if (window.RECCamera) window.RECCamera.stop();
+      this.status        = "Apagado";
+      this.facesDetected = 0;
+      this.handsDetected = 0;
+      this.isPinching    = false;
+      this.indexX        = 0;
+      this.indexY        = 0;
+    }
+
+    getCamaraX()  { return window.RECCamera ? Math.round(window.RECCamera.camaraX) : 0; }
+    getCamaraY()  { return window.RECCamera ? Math.round(window.RECCamera.camaraY) : 0; }
+    getStatus()   { return this.status; }
+    getFaces()    { return this.facesDetected; }
+    getHands()    { return this.handsDetected; }
+    getPinch()    { return this.isPinching; }
+    getIndexX()   { return Math.round(this.indexX); }
+    getIndexY()   { return Math.round(this.indexY); }
   }
 
   Scratch.extensions.register(new IAVisionRECPro());
