@@ -89,7 +89,9 @@ getInfo() {
         }
       },
       { opcode: 'distanceCm', blockType: Scratch.BlockType.REPORTER, text: 'Distancia en cm' },
-      { opcode: 'lineDetected', blockType: Scratch.BlockType.BOOLEAN, text: 'Detecta linea' }
+      { opcode: 'lineDetected', blockType: Scratch.BlockType.BOOLEAN, text: 'Detecta linea' },
+      '---',
+      { opcode: 'restaurarFirmware', blockType: Scratch.BlockType.COMMAND, text: 'Restaurar firmware original 🔄' }
     ],
     menus: {
       motorSide: { items: [{ text: 'IZQUIERDO / B', value: 'IZQ' }, { text: 'DERECHO / A', value: 'DER' }] },
@@ -274,6 +276,39 @@ lineDetected() {
     await this._sendLineRaw('AT+IR');
     return await linePromise;
   });
+}
+
+async restaurarFirmware() {
+  // ── PREPARACIÓN DE INFRAESTRUCTURA ────────────────────────────────────────
+  // Este bloque descarga el firmware de comunicación original (gemini_firmdata_2.0DHT11)
+  // desde el CDN y lo ofrece al docente para flashearlo vía Arduino IDE o herramienta USB.
+  // La carga automática por Web Serial requiere avrdude / WebUSB (próxima versión).
+  const FIRMWARE_CDN = 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/firmdata/gemini_firmdata_2.0DHT11.ino';
+  const FIRMWARE_LOCAL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? window.location.origin + '/ia-robotica/firmdata/gemini_firmdata_2.0DHT11.ino'
+    : FIRMWARE_CDN;
+
+  try {
+    const resp = await fetch(FIRMWARE_LOCAL);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const codigo = await resp.text();
+
+    // Descarga automática del .ino para abrir con Arduino IDE
+    const blob = new Blob([codigo], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'gemini_firmdata_2.0DHT11.ino';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    alert('✅ Firmware original descargado.\n\nAbrí el archivo .ino con Arduino IDE, seleccioná el puerto del robot y hacé clic en "Subir" para restaurar el modo En Vivo / IA.');
+  } catch (e) {
+    console.error('Error al obtener firmware:', e);
+    alert('❌ No se pudo descargar el firmware.\nVerificá tu conexión a internet o el servidor local.\n\n' + e.message);
+  }
 }
 }
 Scratch.extensions.register(new RecPcb1Arduino()); })(Scratch);
