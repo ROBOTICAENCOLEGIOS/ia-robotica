@@ -497,25 +497,12 @@ class _STK500Flasher {
     }
 
     // ── GENERADOR C++ ────────────────────────────────────────────────────────
-    // Ensambla el programa completo usando la librería RoboticaEnColegios.h.
-    // Usa un modal DOM inyectado en document.body — funciona dentro del iframe
-    // de TurboWarp sin ser bloqueado por el popup blocker del navegador.
+    // Recorre el árbol de bloques del lienzo (análisis estático, sin ejecutarlos)
+    // para producir C++ con estructuras de control reales (while/if/for/delay).
+    // El #include <RoboticaEnColegios.h> y los REC_* son la máscara de seguridad
+    // del hardware — no modificar ni exponer pines.
     compilar() {
-      const indent = '    ';
-      const body = this._codeLines.length
-        ? this._codeLines.map(l => indent + l).join('\n')
-        : indent + '// (sin instrucciones — agregá bloques bajo INICIO 🚀)';
-
-      this._codigoFinal =
-`#include <RoboticaEnColegios.h>
-
-void setup() {
-    REC_InicializarPlaca();
-}
-
-void loop() {
-${body}
-}`;
+      this._codigoFinal = this._generarCodigoCPP();
 
       // ── Modal DOM (no puede ser bloqueado, funciona en iframes) ───────────
       const overlay = document.createElement('div');
@@ -566,6 +553,244 @@ ${body}
       }
     }
 
+    // ── ANALIZADOR ESTÁTICO DE BLOQUES ────────────────────────────────────────
+    // _generarCodigoCPP: localiza el HAT jeepAutonomo_inicio en todos los targets
+    // y camina el árbol de hermanos/hijos produciendo líneas C++ correctas.
+    // Usa Scratch.vm.runtime (disponible en extensiones unsandboxed de TurboWarp).
+    _generarCodigoCPP() {
+      const lines = [];
+      const vm = (typeof Scratch !== 'undefined' && Scratch.vm) ? Scratch.vm : null;
+
+      if (vm) {
+        let found = false;
+        for (const target of vm.runtime.targets) {
+          const allBlocks = target.blocks._blocks;
+          for (const id in allBlocks) {
+            if (allBlocks[id].opcode === 'jeepAutonomo_inicio') {
+              found = true;
+              if (allBlocks[id].next) this._walkChain(target, allBlocks[id].next, lines, '    ');
+            }
+          }
+        }
+        if (!found) lines.push('    // (no se encontró el bloque INICIO 🚀 en el lienzo)');
+      } else {
+        // Fallback: código acumulado en runtime (sin estructuras de control)
+        for (const l of this._codeLines) lines.push('    ' + l);
+      }
+
+      if (lines.length === 0) lines.push('    // (sin instrucciones — agregá bloques bajo INICIO 🚀)');
+
+      return [
+        '#include <RoboticaEnColegios.h>',
+        '',
+        'void setup() {',
+        '    REC_InicializarPlaca();',
+        '}',
+        '',
+        'void loop() {',
+        ...lines,
+        '}'
+      ].join('\n');
+    }
+
+    // Camina una cadena lineal de bloques hermanos (siguiendo .next)
+    _walkChain(target, blockId, lines, indent) {
+      let id = blockId;
+      while (id) {
+        const block = target.blocks._blocks[id];
+        if (!block) break;
+        this._genBlock(target, block, lines, indent);
+        id = block.next;
+      }
+    }
+
+    // Traduce un bloque individual a una o varias líneas C++
+    _genBlock(target, block, lines, indent) {
+      const blks = target.blocks._blocks;
+
+      // Valor de un campo dropdown (almacenado directamente en el bloque)
+      const F = (name) => (block.fields[name] || {}).value || '';
+
+      // Valor numérico de un input (shadow literal o reporter conectado)
+      const NUM = (name) => {
+        const inp = block.inputs[name];
+        if (!inp) return 0;
+        const id = inp.block != null ? inp.block : inp.shadow;
+        if (id == null) return 0;
+        const b = blks[id];
+        if (!b) return 0;
+        for (const key of Object.keys(b.fields || {})) {
+          const v = b.fields[key].value;
+          if (v !== undefined && v !== null) return Number(v);
+        }
+        return 0;
+      };
+
+      // Valor hex de un input COLOR
+      const COLOR = (name) => {
+        const inp = block.inputs[name];
+        if (!inp) return '#ff0000';
+        const id = inp.block != null ? inp.block : inp.shadow;
+        if (id == null) return '#ff0000';
+        const b = blks[id];
+        return (b && b.fields.COLOUR) ? b.fields.COLOUR.value : '#ff0000';
+      };
+
+      const p2v = (p) => Math.round(Math.min(Math.abs(p), 100) / 100 * 255);
+
+      switch (block.opcode) {
+
+        // ── Bloques de control nativos de Scratch ──────────────────────────
+        case 'control_forever':
+          lines.push(`${indent}while (true) {`);
+          if (block.inputs.SUBSTACK && block.inputs.SUBSTACK.block)
+            this._walkChain(target, block.inputs.SUBSTACK.block, lines, indent + '    ');
+          lines.push(`${indent}}`);
+          break;
+
+        case 'control_repeat': {
+          const n = NUM('TIMES');
+          lines.push(`${indent}for (int _i = 0; _i < ${n}; _i++) {`);
+          if (block.inputs.SUBSTACK && block.inputs.SUBSTACK.block)
+            this._walkChain(target, block.inputs.SUBSTACK.block, lines, indent + '    ');
+          lines.push(`${indent}}`);
+          break;
+        }
+
+        case 'control_if': {
+          const c = this._genCond(target, block.inputs.CONDITION, blks);
+          lines.push(`${indent}if (${c}) {`);
+          if (block.inputs.SUBSTACK && block.inputs.SUBSTACK.block)
+            this._walkChain(target, block.inputs.SUBSTACK.block, lines, indent + '    ');
+          lines.push(`${indent}}`);
+          break;
+        }
+
+        case 'control_if_else': {
+          const c = this._genCond(target, block.inputs.CONDITION, blks);
+          lines.push(`${indent}if (${c}) {`);
+          if (block.inputs.SUBSTACK && block.inputs.SUBSTACK.block)
+            this._walkChain(target, block.inputs.SUBSTACK.block, lines, indent + '    ');
+          lines.push(`${indent}} else {`);
+          if (block.inputs.SUBSTACK2 && block.inputs.SUBSTACK2.block)
+            this._walkChain(target, block.inputs.SUBSTACK2.block, lines, indent + '    ');
+          lines.push(`${indent}}`);
+          break;
+        }
+
+        case 'control_wait': {
+          const secs = NUM('DURATION');
+          lines.push(`${indent}delay(${Math.round(secs * 1000)});`);
+          break;
+        }
+
+        // ── Motores ─────────────────────────────────────────────────────────
+        case 'jeepAutonomo_moveForward': {
+          const v = p2v(NUM('PCT'));
+          lines.push(F('SIDE') === 'IZQ'
+            ? `${indent}REC_MotorIzquierdo(${v});`
+            : `${indent}REC_MotorDerecho(${v});`);
+          break;
+        }
+
+        case 'jeepAutonomo_moveBackward': {
+          const v = p2v(NUM('PCT'));
+          lines.push(F('SIDE') === 'IZQ'
+            ? `${indent}REC_MotorIzquierdo(-${v});`
+            : `${indent}REC_MotorDerecho(-${v});`);
+          break;
+        }
+
+        case 'jeepAutonomo_stopMotor': {
+          const w = F('WHICH');
+          if (w === 'IZQ' || w === 'AMBOS') lines.push(`${indent}REC_MotorIzquierdo(0);`);
+          if (w === 'DER' || w === 'AMBOS') lines.push(`${indent}REC_MotorDerecho(0);`);
+          break;
+        }
+
+        // ── Luces ────────────────────────────────────────────────────────────
+        case 'jeepAutonomo_encenderLuz': {
+          const hex = COLOR('COLOR');
+          const { r, g, b } = this._hexToRgb(hex);
+          const led = F('LED');
+          if (led === 'TODAS') {
+            lines.push(`${indent}REC_LED(1, ${r}, ${g}, ${b});`);
+            lines.push(`${indent}REC_LED(2, ${r}, ${g}, ${b});`);
+          } else {
+            lines.push(`${indent}REC_LED(${led}, ${r}, ${g}, ${b});`);
+          }
+          break;
+        }
+
+        case 'jeepAutonomo_apagarLuz': {
+          const led = F('LED');
+          if (led === 'TODAS') {
+            lines.push(`${indent}REC_LED(1, 0, 0, 0);`);
+            lines.push(`${indent}REC_LED(2, 0, 0, 0);`);
+          } else {
+            lines.push(`${indent}REC_LED(${led}, 0, 0, 0);`);
+          }
+          break;
+        }
+
+        case 'jeepAutonomo_tocarNota': {
+          const note = NUM('NOTE');
+          const ms   = NUM('MS');
+          lines.push(`${indent}REC_Buzzer(${Math.round(note)}, ${Math.max(0, Math.round(ms))});`);
+          break;
+        }
+
+        default:
+          break;
+      }
+    }
+
+    // Traduce un input boolean a expresión C++ (para condiciones if/while)
+    _genCond(target, input, blks) {
+      if (!input || input.block == null) return 'false';
+      const block = blks[input.block];
+      if (!block) return 'false';
+
+      // Valor de un operando: literal numérico o reporter conocido
+      const VAL = (name) => {
+        const inp = block.inputs[name];
+        if (!inp) return '0';
+        const id = inp.block != null ? inp.block : inp.shadow;
+        if (id == null) return '0';
+        const b = blks[id];
+        if (!b) return '0';
+        if (b.opcode === 'jeepAutonomo_distancia') return 'REC_Distancia()';
+        if (b.opcode === 'jeepAutonomo_getDHT') {
+          const tipo = (b.fields.TIPO || { value: 'TEMP' }).value;
+          return `REC_DHT("${tipo}")`;
+        }
+        for (const key of Object.keys(b.fields || {})) return String(b.fields[key].value);
+        return '0';
+      };
+
+      switch (block.opcode) {
+        case 'jeepAutonomo_lineaDetectada': return 'REC_LineaDetectada()';
+        case 'operator_gt':     return `${VAL('OPERAND1')} > ${VAL('OPERAND2')}`;
+        case 'operator_lt':     return `${VAL('OPERAND1')} < ${VAL('OPERAND2')}`;
+        case 'operator_equals': return `${VAL('OPERAND1')} == ${VAL('OPERAND2')}`;
+        case 'operator_and': {
+          const l = this._genCond(target, block.inputs.OPERAND1, blks);
+          const r = this._genCond(target, block.inputs.OPERAND2, blks);
+          return `(${l}) && (${r})`;
+        }
+        case 'operator_or': {
+          const l = this._genCond(target, block.inputs.OPERAND1, blks);
+          const r = this._genCond(target, block.inputs.OPERAND2, blks);
+          return `(${l}) || (${r})`;
+        }
+        case 'operator_not': {
+          const v = this._genCond(target, block.inputs.OPERAND, blks);
+          return `!(${v})`;
+        }
+        default: return 'false';
+      }
+    }
+
     // ── LOG INTERNO ────────────────────────────────────────────────────────
     _addLog(msg) {
       const ts = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -575,15 +800,8 @@ ${body}
 
     // ── SUBIR AL ROBOT: orquesta WASM + STK500v1 ──────────────────────────
     async subirAlRobot() {
-      // Generar código si aún no existe
-      if (!this._codigoFinal) {
-        const indent = '    ';
-        const body   = this._codeLines.length
-          ? this._codeLines.map(l => indent + l).join('\n')
-          : indent + '// (sin instrucciones)';
-        this._codigoFinal =
-`#include <RoboticaEnColegios.h>\n\nvoid setup() {\n    REC_InicializarPlaca();\n}\n\nvoid loop() {\n${body}\n}`;
-      }
+      // Generar siempre código fresco del árbol de bloques del lienzo
+      this._codigoFinal = this._generarCodigoCPP();
 
       this._uploadStatus = 'INICIANDO...';
       this._addLog('Iniciando secuencia de carga al robot...');
