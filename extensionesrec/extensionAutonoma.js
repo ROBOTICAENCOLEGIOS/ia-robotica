@@ -335,12 +335,6 @@ class _STK500Flasher {
               WHICH: { type: Scratch.ArgumentType.STRING, menu: 'stopWhich', defaultValue: 'AMBOS' }
             }
           },
-          {
-            opcode: 'esperar',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '⏱ Esperar [SEG] segundos',
-            arguments: { SEG: { type: Scratch.ArgumentType.NUMBER, defaultValue: 1 } }
-          },
 
           // ── LUCES ────────────────────────────────────────────────────────
           '---',
@@ -385,7 +379,6 @@ class _STK500Flasher {
           // ── GENERADOR C++ ─────────────────────────────────────────────────
           '---',
           { opcode: 'compilar',       blockType: Scratch.BlockType.COMMAND,  text: '⚙️ Compilar programa C++' },
-          { opcode: 'verCodigo',      blockType: Scratch.BlockType.REPORTER, text: '📄 ver código generado' },
           { opcode: 'copiarCodigo',   blockType: Scratch.BlockType.COMMAND,  text: '📋 Copiar código al portapapeles' },
           { opcode: 'subirAlRobot',   blockType: Scratch.BlockType.COMMAND,  text: '⬆️ Subir al Robot 🚀' },
           '---',
@@ -451,13 +444,6 @@ class _STK500Flasher {
       if (args.WHICH === 'DER'  || args.WHICH === 'AMBOS') this._codeLines.push(`REC_MotorDerecho(0);`);
     }
 
-    // esperar() duplica el delay en Scratch (pausa real del hilo) Y en el código C++
-    esperar(args) {
-      const ms = Math.round(Math.max(0, Number(args.SEG)) * 1000);
-      this._codeLines.push(`delay(${ms});`);
-      return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
     // ── LUCES ──────────────────────────────────────────────────────────────
     _hexToRgb(hex) {
       let s = String(hex).replace('#', '');
@@ -512,8 +498,8 @@ class _STK500Flasher {
 
     // ── GENERADOR C++ ────────────────────────────────────────────────────────
     // Ensambla el programa completo usando la librería RoboticaEnColegios.h.
-    // La lógica de control (if/loop/delay) viene de los bloques nativos de
-    // Scratch que cuelgan del HAT INICIO y ya fue ejecutada y registrada.
+    // Usa un modal DOM inyectado en document.body — funciona dentro del iframe
+    // de TurboWarp sin ser bloqueado por el popup blocker del navegador.
     compilar() {
       const indent = '    ';
       const body = this._codeLines.length
@@ -531,22 +517,44 @@ void loop() {
 ${body}
 }`;
 
-      // Muestra el código en un diálogo para inspección inmediata del docente
-      try {
-        const ventana = window.open('', '_blank', 'width=700,height=500');
-        ventana.document.write(
-          `<html><head><title>Código C++ — Jeep Autónomo</title></head>` +
-          `<body style="font-family:monospace;white-space:pre;background:#1a1a1a;color:#a8ff78;padding:20px">` +
-          this._codigoFinal.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-          `</body></html>`
-        );
-      } catch (e) {
-        alert('Código generado:\n\n' + this._codigoFinal);
-      }
-    }
+      // ── Modal DOM (no puede ser bloqueado, funciona en iframes) ───────────
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:999999;display:flex;align-items:center;justify-content:center';
 
-    verCodigo() {
-      return this._codigoFinal || '(ejecutá el INICIO 🚀 y luego Compilar)';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#1a1a2e;border:2px solid #a8ff78;border-radius:8px;padding:20px;width:min(720px,92vw);max-height:82vh;display:flex;flex-direction:column;gap:12px;box-sizing:border-box';
+
+      const title = document.createElement('div');
+      title.style.cssText = 'color:#a8ff78;font-family:monospace;font-size:14px;font-weight:bold;flex-shrink:0';
+      title.textContent = '⚙️ Código C++ generado — Jeep Autónomo';
+
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'background:#0d0d1a;color:#e0e0e0;padding:15px;border-radius:4px;overflow:auto;flex:1;font-family:monospace;font-size:13px;margin:0;white-space:pre;min-height:0';
+      pre.textContent = this._codigoFinal;
+
+      const btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;flex-shrink:0';
+
+      const btnCopy = document.createElement('button');
+      btnCopy.style.cssText = 'background:#4b5320;color:#fff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-family:monospace;font-size:13px';
+      btnCopy.textContent = '📋 Copiar';
+      btnCopy.onclick = () => {
+        navigator.clipboard.writeText(this._codigoFinal).catch(() => {});
+        btnCopy.textContent = '✅ ¡Copiado!';
+        setTimeout(() => { btnCopy.textContent = '📋 Copiar'; }, 1800);
+      };
+
+      const btnClose = document.createElement('button');
+      btnClose.style.cssText = 'background:#6b0000;color:#fff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-family:monospace;font-size:13px';
+      btnClose.textContent = '✖ Cerrar';
+      const cerrar = () => { try { document.body.removeChild(overlay); } catch (_) {} };
+      btnClose.onclick = cerrar;
+      overlay.onclick = (e) => { if (e.target === overlay) cerrar(); };
+
+      btns.append(btnCopy, btnClose);
+      box.append(title, pre, btns);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
     }
 
     async copiarCodigo() {
