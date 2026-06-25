@@ -10,7 +10,7 @@
  *   3. _STK500Flasher → protocolo STK500v1 nativo sobre Web Serial API
  *      (compatible con bootloader Optiboot, Arduino Uno/Nano, ATmega328P)
  *
- * Mapeo de pines (firmware gemini_firmdata_2.0DHT11.ino):
+ * Mapeo de pines internos (encapsulados en firmware_rec_blindado.hex):
  *   Motor IZQ: IN1=6, IN2=7, PWM=5
  *   Motor DER: IN1=8, IN2=9, PWM=10  (+12 compensación de torque)
  *   Ultrasonido: TRIG=2, ECHO=12

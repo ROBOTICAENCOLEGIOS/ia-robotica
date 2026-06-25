@@ -278,36 +278,125 @@ lineDetected() {
   });
 }
 
+// Convierte un string Intel HEX en Uint8Array binario (ATmega328P)
+_parseIntelHex(hexStr) {
+  const segs = []; let maxEnd = 0;
+  for (const rec of hexStr.split(/\r?\n/).filter(l => l.startsWith(':'))) {
+    const b = rec.slice(1).match(/.{2}/g).map(h => parseInt(h, 16));
+    const len = b[0], addr = (b[1] << 8) | b[2], type = b[3];
+    if (type === 0x00) { segs.push({ addr, data: b.slice(4, 4 + len) }); maxEnd = Math.max(maxEnd, addr + len); }
+    else if (type === 0x01) break;
+  }
+  const bin = new Uint8Array(maxEnd).fill(0xff);
+  for (const { addr, data } of segs) data.forEach((v, i) => (bin[addr + i] = v));
+  return bin;
+}
+
+// Flashea el binario firmware_rec_blindado.hex directamente al robot vía STK500v1.
+// El alumno recupera el modo En Vivo / IA con un solo clic, sin necesidad de Arduino IDE.
 async restaurarFirmware() {
-  // ── PREPARACIÓN DE INFRAESTRUCTURA ────────────────────────────────────────
-  // Este bloque descarga el firmware de comunicación original (gemini_firmdata_2.0DHT11)
-  // desde el CDN y lo ofrece al docente para flashearlo vía Arduino IDE o herramienta USB.
-  // La carga automática por Web Serial requiere avrdude / WebUSB (próxima versión).
-  const FIRMWARE_CDN = 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/firmdata/gemini_firmdata_2.0DHT11.ino';
-  const FIRMWARE_LOCAL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
-    ? window.location.origin + '/ia-robotica/firmdata/gemini_firmdata_2.0DHT11.ino'
-    : FIRMWARE_CDN;
+  const HEX_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? window.location.origin + '/ia-robotica/firmdata/firmware_rec_blindado.hex'
+    : 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/firmdata/firmware_rec_blindado.hex';
+
+  const log = (m) => console.info('[RestaurarFirmware]', m);
+  let port = null, writer = null, looping = false;
+  const rxBuf = [], rxWait = [];
+
+  const readByte = (to = 2000) => {
+    if (rxBuf.length > 0) return Promise.resolve(rxBuf.shift());
+    return new Promise((res, rej) => {
+      let fn;
+      const t = setTimeout(() => { const i = rxWait.indexOf(fn); if (i >= 0) rxWait.splice(i, 1); rej(new Error('Timeout: bootloader no responde')); }, to);
+      fn = (b) => { clearTimeout(t); res(b); };
+      rxWait.push(fn);
+    });
+  };
+  const expectOK = async (to = 2000) => {
+    const s = await readByte(to), o = await readByte(to);
+    if (s !== 0x14 || o !== 0x10) throw new Error('STK500: respuesta inválida 0x' + s.toString(16) + ' 0x' + o.toString(16));
+  };
+  const send  = async (b) => writer.write(new Uint8Array(b));
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const close = async () => {
+    looping = false;
+    try { writer.releaseLock(); } catch (_) {}
+    try { await port.close(); }   catch (_) {}
+  };
 
   try {
-    const resp = await fetch(FIRMWARE_LOCAL);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const codigo = await resp.text();
+    // ── 1. Descargar el binario blindado ─────────────────────────────────
+    log('Descargando firmware_rec_blindado.hex...');
+    const resp = await fetch(HEX_URL, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('No se pudo obtener el firmware: HTTP ' + resp.status);
+    const binary = this._parseIntelHex(await resp.text());
+    log('Firmware: ' + binary.length + ' bytes listos para flashear.');
 
-    // Descarga automática del .ino para abrir con Arduino IDE
-    const blob = new Blob([codigo], { type: 'text/plain' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'gemini_firmdata_2.0DHT11.ino';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // ── 2. Abrir puerto y arrancar Optiboot vía DTR ───────────────────────
+    log('Esperando selección de puerto COM...');
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    writer = port.writable.getWriter();
 
-    alert('✅ Firmware original descargado.\n\nAbrí el archivo .ino con Arduino IDE, seleccioná el puerto del robot y hacé clic en "Subir" para restaurar el modo En Vivo / IA.');
-  } catch (e) {
-    console.error('Error al obtener firmware:', e);
-    alert('❌ No se pudo descargar el firmware.\nVerificá tu conexión a internet o el servidor local.\n\n' + e.message);
+    // Loop de lectura asíncrono
+    looping = true;
+    (async () => {
+      while (looping && port.readable) {
+        const reader = port.readable.getReader();
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) for (const b of value) { if (rxWait.length > 0) rxWait.shift()(b); else rxBuf.push(b); }
+          }
+        } catch (_) { break; } finally { try { reader.releaseLock(); } catch (_) {} }
+      }
+    })();
+
+    log('Reiniciando Arduino (DTR)...');
+    await port.setSignals({ dataTerminalReady: false });
+    await sleep(250);
+    await port.setSignals({ dataTerminalReady: true });
+    await sleep(50);
+
+    // ── 3. Sincronizar con bootloader ─────────────────────────────────────
+    log('Sincronizando con Optiboot...');
+    rxBuf.length = 0;
+    let synced = false;
+    for (let i = 0; i < 10 && !synced; i++) {
+      await send([0x30, 0x20]);
+      try { await expectOK(500); synced = true; } catch (_) { await sleep(50); }
+    }
+    if (!synced) throw new Error('No se pudo sincronizar con el bootloader.\n→ ¿El cable USB está bien conectado?\n→ ¿Seleccionaste el puerto correcto?');
+
+    // ── 4. Configurar dispositivo ATmega328P ──────────────────────────────
+    await send([0x42, 0x86,0x00,0x00,0x01,0x01,0x01,0x01,0x06, 0xff,0xff,0xff,0xff,0x00,0x80,0x04,0x00, 0x00,0x00,0x80,0x00, 0x20]);
+    await expectOK();
+    await send([0x50, 0x20]); await expectOK();
+
+    // ── 5. Escribir páginas de 128 bytes ─────────────────────────────────
+    const PAGE = 128, total = Math.ceil(binary.length / PAGE);
+    for (let p = 0; p < total; p++) {
+      const off = p * PAGE;
+      const chunk = new Uint8Array(PAGE).fill(0xff);
+      chunk.set(binary.slice(off, off + PAGE));
+      const wa = off / 2;
+      log('Página ' + (p + 1) + '/' + total + ' (' + Math.round((p + 1) / total * 100) + '%)...');
+      await send([0x55, wa & 0xff, (wa >> 8) & 0xff, 0x20]); await expectOK();
+      await send([0x64, 0x00, PAGE, 0x46, ...chunk, 0x20]);   await expectOK(5000);
+    }
+
+    // ── 6. Salir del modo programación ────────────────────────────────────
+    await send([0x51, 0x20]); await expectOK();
+    await close();
+
+    log('✅ Firmware restaurado.');
+    alert('✅ Firmware restaurado correctamente.\n\n¡El robot volvió al modo En Vivo / IA!');
+
+  } catch (err) {
+    console.error('[RestaurarFirmware]', err);
+    try { await close(); } catch (_) {}
+    alert('❌ Error al restaurar el firmware:\n\n' + err.message + '\n\nRevisá la consola del navegador para más detalles.');
   }
 }
 }
