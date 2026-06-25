@@ -886,7 +886,7 @@ class _STK500Flasher {
     // URL configurable: apuntar al .exe generado con `npm run build-exe`
     // en la carpeta agente-windows/ y publicado en el repo.
     descargarAgente() {
-      const AGENTE_URL = 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/agente-windows/REC-Agente-Windows.exe';
+      const AGENTE_URL = 'https://github.com/ROBOTICAENCOLEGIOS/Laboratorio-IA/releases/download/v1.0.0/REC-Agente-Windows.exe';
       const a = document.createElement('a');
       a.href     = AGENTE_URL;
       a.download = 'REC-Agente-Windows.exe';
