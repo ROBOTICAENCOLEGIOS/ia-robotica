@@ -378,9 +378,10 @@ class _STK500Flasher {
 
           // ── GENERADOR C++ ─────────────────────────────────────────────────
           '---',
-          { opcode: 'compilar',       blockType: Scratch.BlockType.COMMAND,  text: '⚙️ Compilar programa C++' },
-          { opcode: 'copiarCodigo',   blockType: Scratch.BlockType.COMMAND,  text: '📋 Copiar código al portapapeles' },
-          { opcode: 'subirAlRobot',   blockType: Scratch.BlockType.COMMAND,  text: '⬆️ Subir al Robot 🚀' },
+          { opcode: 'compilar',        blockType: Scratch.BlockType.COMMAND,  text: '⚙️ Compilar programa C++' },
+          { opcode: 'copiarCodigo',    blockType: Scratch.BlockType.COMMAND,  text: '📋 Copiar código al portapapeles' },
+          { opcode: 'subirAlRobot',    blockType: Scratch.BlockType.COMMAND,  text: '⬆️ Subir al Robot 🚀' },
+          { opcode: 'descargarAgente', blockType: Scratch.BlockType.COMMAND,  text: '⬇️ Descargar Compilador (Windows)' },
           '---',
           { opcode: 'getUploadStatus', blockType: Scratch.BlockType.REPORTER, text: '📡 estado de carga' },
           { opcode: 'getLog',          blockType: Scratch.BlockType.REPORTER, text: '🪲 registro de errores' }
@@ -798,7 +799,7 @@ class _STK500Flasher {
       if (this._log.length > 20) this._log.pop();
     }
 
-    // ── SUBIR AL ROBOT: orquesta WASM + STK500v1 ──────────────────────────
+    // ── SUBIR AL ROBOT: Agente Windows (localhost:3000) → STK500v1 ──────────
     async subirAlRobot() {
       // Generar siempre código fresco del árbol de bloques del lienzo
       this._codigoFinal = this._generarCodigoCPP();
@@ -816,40 +817,44 @@ class _STK500Flasher {
       const flasher = new _STK500Flasher();
 
       try {
-        // ── PASO 1: Intentar compilación WASM local ──────────────────────
+        // ── PASO 1: Compilar vía Agente Windows local (localhost:3000) ────
+        onProgress('⏳ Enviando código al Agente local...');
         let binary;
         try {
-          await this._wasm.load(onProgress);
-          const hexStr = await this._wasm.compile(this._codigoFinal, onProgress);
-          binary = _parseIntelHex(hexStr);
-          this._addLog('✅ Compilación WASM completada.');
+          const resp = await fetch('http://localhost:3000/compilar', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ codigo: this._codigoFinal })
+          });
+          if (!resp.ok) {
+            const detail = await resp.text().catch(() => resp.statusText);
+            throw new Error(`Agente respondió ${resp.status}: ${detail}`);
+          }
+          const buf = await resp.arrayBuffer();
+          const ct  = resp.headers.get('Content-Type') || '';
+          // El agente devuelve Intel HEX (text/plain) → parsear a Uint8Array
+          if (ct.includes('text') || ct.includes('hex')) {
+            binary = _parseIntelHex(new TextDecoder().decode(buf));
+          } else {
+            const hexStr = new TextDecoder().decode(buf);
+            binary = hexStr.trimStart().startsWith(':')
+              ? _parseIntelHex(hexStr)
+              : new Uint8Array(buf);
+          }
+          onProgress('✅ Compilación exitosa');
         } catch (e) {
-          if (e.message === 'WASM_NO_DISPONIBLE') {
-            // ── FALLBACK PEDAGÓGICO: descarga .ino para Arduino IDE ──────
-            this._uploadStatus = '⏳ WASM en desarrollo';
-            this._addLog('⚠️ Compilador WASM aún no disponible. Descargando .ino...');
-            const blob = new Blob([this._codigoFinal], { type: 'text/plain' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
-            a.href     = url;
-            a.download = 'jeep_autonomo.ino';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+          if (e.name === 'TypeError' || e.message.includes('Failed to fetch') ||
+              e.message.includes('NetworkError') || e.message.includes('REFUSED')) {
+            this._uploadStatus = '❌ Agente no disponible';
+            this._addLog('⚠️ Agente Windows no encontrado en localhost:3000');
             alert(
-              '📦 Código descargado como jeep_autonomo.ino\n\n' +
-              'Pasos para cargarlo al robot:\n' +
-              '  1. Abrí Arduino IDE\n' +
-              '  2. Archivo → Abrir → jeep_autonomo.ino\n' +
-              '  3. Seleccioná el puerto COM del robot\n' +
-              '  4. Hacé clic en "Subir" (→)\n\n' +
-              '⚡ La compilación y carga automática vía WASM estará\n' +
-              '   disponible en la próxima versión del laboratorio.'
+              '⚠️ No se encontró el Agente de compilación.\n\n' +
+              'Para subir programas al robot necesitás el Agente Windows instalado y corriendo.\n\n' +
+              '→ Usá el bloque "⬇️ Descargar Compilador (Windows)" para obtenerlo.'
             );
             return;
           }
-          throw e; // error inesperado → subir al bloque catch principal
+          throw e;
         }
 
         // ── PASO 2: Flasheo STK500v1 vía Web Serial ──────────────────────
@@ -875,6 +880,19 @@ class _STK500Flasher {
       } finally {
         try { await flasher.close(); } catch (_) {}
       }
+    }
+
+    // ── DESCARGA DEL AGENTE WINDOWS ──────────────────────────────────────────
+    // URL configurable: apuntar al .exe generado con `npm run build-exe`
+    // en la carpeta agente-windows/ y publicado en el repo.
+    descargarAgente() {
+      const AGENTE_URL = 'https://cdn.jsdelivr.net/gh/ROBOTICAENCOLEGIOS/ia-robotica@main/agente-windows/REC-Agente-Windows.exe';
+      const a = document.createElement('a');
+      a.href     = AGENTE_URL;
+      a.download = 'REC-Agente-Windows.exe';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
 
     getUploadStatus() { return this._uploadStatus; }

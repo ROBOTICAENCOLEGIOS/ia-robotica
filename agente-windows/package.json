@@ -1,0 +1,25 @@
+{
+  "name": "rec-agente-windows",
+  "version": "1.0.0",
+  "description": "Agente local de compilación offline para Jeep Autónomo — Robótica En Colegios",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build-exe": "pkg server.js --targets node18-win-x64 --output REC-Agente-Windows.exe --compress GZip"
+  },
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "assets": ["arduino-cli.exe"],
+    "outputPath": "."
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
