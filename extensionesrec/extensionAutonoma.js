@@ -307,36 +307,33 @@ class _STK500Flasher {
             isEdgeActivated: false
           },
 
-          // ── MOVIMIENTO ───────────────────────────────────────────────────
+          // ── MOTORES (homologados con REC PCB1 Arduino) ─────────────────
           '---',
           {
-            opcode: 'adelante',
+            opcode: 'moveForward',
             blockType: Scratch.BlockType.COMMAND,
-            text: '▲ Avanzar a [VEL] %',
-            arguments: { VEL: { type: Scratch.ArgumentType.NUMBER, defaultValue: 70 } }
+            text: 'Mover motor [SIDE] hacia ADELANTE a [PCT]%',
+            arguments: {
+              SIDE: { type: Scratch.ArgumentType.STRING, menu: 'motorSide', defaultValue: 'IZQ' },
+              PCT:  { type: Scratch.ArgumentType.NUMBER, defaultValue: 50 }
+            }
           },
           {
-            opcode: 'atras',
+            opcode: 'moveBackward',
             blockType: Scratch.BlockType.COMMAND,
-            text: '▼ Retroceder a [VEL] %',
-            arguments: { VEL: { type: Scratch.ArgumentType.NUMBER, defaultValue: 70 } }
+            text: 'Mover motor [SIDE] hacia ATRAS a [PCT]%',
+            arguments: {
+              SIDE: { type: Scratch.ArgumentType.STRING, menu: 'motorSide', defaultValue: 'IZQ' },
+              PCT:  { type: Scratch.ArgumentType.NUMBER, defaultValue: 50 }
+            }
           },
           {
-            opcode: 'girarIzq',
+            opcode: 'stopMotor',
             blockType: Scratch.BlockType.COMMAND,
-            text: '◄ Girar izquierda a [VEL] %',
-            arguments: { VEL: { type: Scratch.ArgumentType.NUMBER, defaultValue: 60 } }
-          },
-          {
-            opcode: 'girarDer',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '► Girar derecha a [VEL] %',
-            arguments: { VEL: { type: Scratch.ArgumentType.NUMBER, defaultValue: 60 } }
-          },
-          {
-            opcode: 'frenar',
-            blockType: Scratch.BlockType.COMMAND,
-            text: '■ Frenar'
+            text: 'Detener motor [WHICH]',
+            arguments: {
+              WHICH: { type: Scratch.ArgumentType.STRING, menu: 'stopWhich', defaultValue: 'AMBOS' }
+            }
           },
           {
             opcode: 'esperar',
@@ -397,6 +394,8 @@ class _STK500Flasher {
         ],
 
         menus: {
+          motorSide: { acceptReporters: false, items: [{ text: 'IZQUIERDO / B', value: 'IZQ' }, { text: 'DERECHO / A', value: 'DER' }] },
+          stopWhich: { acceptReporters: false, items: [{ text: 'IZQUIERDO / B', value: 'IZQ' }, { text: 'DERECHO / A', value: 'DER' }, { text: 'AMBOS', value: 'AMBOS' }] },
           ledMenu: { acceptReporters: false, items: ['1', '2', 'TODAS'] },
           dhtMenu: {
             acceptReporters: false,
@@ -429,32 +428,27 @@ class _STK500Flasher {
       return true;
     }
 
-    // ── MOVIMIENTO ────────────────────────────────────────────────────────────
-    // _pct2pwm convierte un porcentaje de velocidad (0-100) al rango PWM (0-255)
+    // ── MOTORES (TB6612FNG — homologados con REC PCB1 Arduino) ─────────────────
+    // _pct2pwm convierte porcentaje (0-100) al rango PWM (0-255) del ATmega328P
     _pct2pwm(pct) { return Math.round(Math.min(Math.abs(Number(pct)), 100) / 100 * 255); }
 
-    adelante(args) {
-      const v = this._pct2pwm(args.VEL);
-      this._codeLines.push(`REC_Adelante(${v});`);
+    // Positivo = adelante, negativo = atrás (freno activo con abs+dir en TB6612FNG)
+    moveForward(args) {
+      const v = this._pct2pwm(args.PCT);
+      if (args.SIDE === 'IZQ') this._codeLines.push(`REC_MotorIzquierdo(${v});`);
+      else                     this._codeLines.push(`REC_MotorDerecho(${v});`);
     }
 
-    atras(args) {
-      const v = this._pct2pwm(args.VEL);
-      this._codeLines.push(`REC_Atras(${v});`);
+    moveBackward(args) {
+      const v = this._pct2pwm(args.PCT);
+      if (args.SIDE === 'IZQ') this._codeLines.push(`REC_MotorIzquierdo(-${v});`);
+      else                     this._codeLines.push(`REC_MotorDerecho(-${v});`);
     }
 
-    girarIzq(args) {
-      const v = this._pct2pwm(args.VEL);
-      this._codeLines.push(`REC_GirarIzquierda(${v});`);
-    }
-
-    girarDer(args) {
-      const v = this._pct2pwm(args.VEL);
-      this._codeLines.push(`REC_GirarDerecha(${v});`);
-    }
-
-    frenar() {
-      this._codeLines.push(`REC_Frenar();`);
+    // 0 = freno activo (IN1=L, IN2=L, PWM=255 en driver TB6612FNG)
+    stopMotor(args) {
+      if (args.WHICH === 'IZQ'  || args.WHICH === 'AMBOS') this._codeLines.push(`REC_MotorIzquierdo(0);`);
+      if (args.WHICH === 'DER'  || args.WHICH === 'AMBOS') this._codeLines.push(`REC_MotorDerecho(0);`);
     }
 
     // esperar() duplica el delay en Scratch (pausa real del hilo) Y en el código C++
