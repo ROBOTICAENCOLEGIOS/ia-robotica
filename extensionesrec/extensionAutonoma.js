@@ -293,7 +293,7 @@ class _STK500Flasher {
     getInfo() {
       return {
         id: 'jeepAutonomo',
-        name: 'Jeep Autónomo',
+        name: 'ROBOT 1 Arduino AUTONOMO',
         color1: '#00cca3',
         color2: '#00a888',
         color3: '#008a70',
@@ -877,7 +877,7 @@ class _STK500Flasher {
     // URL configurable: apuntar al .exe generado con `npm run build-exe`
     // en la carpeta agente-windows/ y publicado en el repo.
     descargarAgente() {
-      const AGENTE_URL = 'https://github.com/ROBOTICAENCOLEGIOS/Laboratorio-IA/releases/download/v1.0.0/Instalador-Compilador-REC.exe';
+      const AGENTE_URL = 'https://github.com/ROBOTICAENCOLEGIOS/Laboratorio-IA/releases/download/2.0/Instalador-Compilador-REC.exe';
       const a = document.createElement('a');
       a.href     = AGENTE_URL;
       a.download = 'Instalador-Compilador-REC.exe';
