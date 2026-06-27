@@ -294,9 +294,9 @@ class _STK500Flasher {
       return {
         id: 'jeepAutonomo',
         name: 'Jeep Autónomo',
-        color1: '#1a3a1a',
-        color2: '#142814',
-        color3: '#0e1e0e',
+        color1: '#00f1e4',
+        color2: '#00c4b9',
+        color3: '#009e94',
         blocks: [
 
           // ── HAT: punto de entrada del programa autónomo ──────────────────
@@ -379,7 +379,6 @@ class _STK500Flasher {
           // ── GENERADOR C++ ─────────────────────────────────────────────────
           '---',
           { opcode: 'compilar',        blockType: Scratch.BlockType.COMMAND,  text: '⚙️ Compilar programa C++' },
-          { opcode: 'copiarCodigo',    blockType: Scratch.BlockType.COMMAND,  text: '📋 Copiar código al portapapeles' },
           { opcode: 'subirAlRobot',    blockType: Scratch.BlockType.COMMAND,  text: '⬆️ Subir al Robot 🚀' },
           { opcode: 'descargarAgente', blockType: Scratch.BlockType.COMMAND,  text: '⬇️ Descargar Compilador (Windows)' },
           '---',
@@ -543,15 +542,6 @@ class _STK500Flasher {
       box.append(title, pre, btns);
       overlay.appendChild(box);
       document.body.appendChild(overlay);
-    }
-
-    async copiarCodigo() {
-      if (!this._codigoFinal) return;
-      try {
-        await navigator.clipboard.writeText(this._codigoFinal);
-      } catch (e) {
-        console.warn('Clipboard no disponible:', e);
-      }
     }
 
     // ── ANALIZADOR ESTÁTICO DE BLOQUES ────────────────────────────────────────
@@ -866,6 +856,7 @@ class _STK500Flasher {
 
         this._uploadStatus = '✅ Carga exitosa';
         this._addLog('✅ ¡Programa cargado! El robot ya funciona en modo autónomo.');
+        this._mostrarExito();
 
       } catch (err) {
         // ── MANEJO DE ERRORES PEDAGÓGICO ─────────────────────────────────
@@ -886,13 +877,60 @@ class _STK500Flasher {
     // URL configurable: apuntar al .exe generado con `npm run build-exe`
     // en la carpeta agente-windows/ y publicado en el repo.
     descargarAgente() {
-      const AGENTE_URL = 'https://github.com/ROBOTICAENCOLEGIOS/Laboratorio-IA/releases/download/v1.0.0/REC-Agente-Windows.exe';
+      const AGENTE_URL = 'https://github.com/ROBOTICAENCOLEGIOS/Laboratorio-IA/releases/download/v1.0.0/Instalador-Compilador-REC.exe';
       const a = document.createElement('a');
       a.href     = AGENTE_URL;
-      a.download = 'REC-Agente-Windows.exe';
+      a.download = 'Instalador-Compilador-REC.exe';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+    }
+
+    // ── MODAL DE ÉXITO ────────────────────────────────────────────────────────
+    _mostrarExito() {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = [
+        'position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999',
+        'background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center'
+      ].join(';');
+
+      const box = document.createElement('div');
+      box.style.cssText = [
+        'background:#0d1b2a;border:3px solid #00f1e4;border-radius:16px',
+        'padding:48px 56px;display:flex;flex-direction:column;align-items:center',
+        'gap:20px;box-shadow:0 0 48px rgba(0,241,228,.4);max-width:480px;text-align:center'
+      ].join(';');
+
+      const icon = document.createElement('div');
+      icon.style.cssText = 'font-size:72px;line-height:1';
+      icon.textContent = '🚀';
+
+      const titulo = document.createElement('div');
+      titulo.style.cssText = [
+        'color:#00f1e4;font-family:Arial,sans-serif;font-size:28px',
+        'font-weight:900;letter-spacing:-0.5px;line-height:1.2'
+      ].join(';');
+      titulo.textContent = '¡Compilación y subida exitosa!';
+
+      const sub = document.createElement('div');
+      sub.style.cssText = 'color:#b0f5f1;font-family:Arial,sans-serif;font-size:15px;line-height:1.5';
+      sub.textContent = 'Tu programa ya está corriendo en el robot. ¡A probarlo!';
+
+      const btnCerrar = document.createElement('button');
+      btnCerrar.style.cssText = [
+        'margin-top:8px;background:#00f1e4;color:#0d1b2a;border:none',
+        'padding:12px 40px;border-radius:8px;cursor:pointer',
+        'font-family:Arial,sans-serif;font-size:16px;font-weight:700'
+      ].join(';');
+      btnCerrar.textContent = '¡Genial!';
+      const cerrar = () => { try { document.body.removeChild(overlay); } catch (_) {} };
+      btnCerrar.onclick = cerrar;
+      overlay.onclick = (e) => { if (e.target === overlay) cerrar(); };
+      setTimeout(cerrar, 8000); // auto-cierre a los 8 s
+
+      box.append(icon, titulo, sub, btnCerrar);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
     }
 
     getUploadStatus() { return this._uploadStatus; }
