@@ -294,9 +294,9 @@ class _STK500Flasher {
       return {
         id: 'jeepAutonomo',
         name: 'Jeep Autónomo',
-        color1: '#00f1e4',
-        color2: '#00c4b9',
-        color3: '#009e94',
+        color1: '#00cca3',
+        color2: '#00a888',
+        color3: '#008a70',
         blocks: [
 
           // ── HAT: punto de entrada del programa autónomo ──────────────────
