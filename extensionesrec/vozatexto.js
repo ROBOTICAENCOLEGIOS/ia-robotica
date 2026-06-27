@@ -1,6 +1,10 @@
 (function(Scratch) {
   'use strict';
 
+  if (!Scratch.extensions.unsandboxed) {
+    throw new Error('Voz a Texto debe ejecutarse en modo unsandboxed.');
+  }
+
   class VozATexto {
     constructor() {
       this.speechResult = ""; 
